@@ -1,93 +1,164 @@
 ---
 title: "Session 1: Frequentist Mixed-Effects Models with lme4"
 subtitle: "Data Analysis Workshop 2026"
-author: "Nebrija Workshop"
+author: "Dr. Bernhard Angele"
 format:
   revealjs:
     incremental: true
 ---
 
-## Audience and Goals
+## Session roadmap (3h)
 
-- PhD students in cognitive and experimental psychology
-- Psycholinguistics and education research contexts
-- Goal: defensible frequentist mixed-effects workflows in `lme4`
+- **Part 1 (45 min):** design-model alignment and random-effects structures
+- **Part 2 (45 min):** model specification, contrasts, and interpretation
+- **Part 3 (60 min):** convergence/singularity diagnostics and troubleshooting
+- **Part 4 (30 min):** reporting, APA-style write-up, and project clinic
 
-## 1) Design-Model Alignment
+## Workshop context
 
-### The "Maximal" Debate
+- Audience: doctoral researchers in cognitive psychology, language, and education
+- Focus: applied, critical, publication-oriented mixed-effects analysis
+- Core software: `lme4`, `lmerTest`, `emmeans`, `ggplot2`
 
-- Barr et al. (2013): strict design-model alignment to protect Type I error
-- Matuschek et al. (2017): pragmatic simplification to preserve power
-- Practice: pre-register model architecture and simplification logic
+## Learning objectives for this session
 
-### Crossed vs. Nested Factors
+- Justify complex crossed random-effects structures for participants and items
+- Diagnose and resolve convergence and singular-fit warnings in `lme4`
+- Specify defensible contrasts tied to hypotheses
+- Draft method/results reporting aligned with journal expectations
 
-- Crossed: participants see multiple items/lists over conditions
-- Nested: lower-level units only occur within one higher-level grouping
-- Incorrect classification biases uncertainty and inferential claims
+## Why mixed-effects models?
 
-## 2) Advanced `lme4` Mechanics & Syntax
+- Repeated measures violate independence assumptions
+- Participants and stimulus items add crossed random variability
+- Ignoring random structure inflates error rates and weakens generalization
 
-### Suppressing Correlations with `||`
+## The "keep it maximal" discussion
 
-- `(Condition || Subject)` fits intercept + slope variances without correlation terms
-- Useful when correlation estimates are unstable or weakly identified
-- Assumes random intercept/slope correlation can be omitted for estimation stability
+- Barr et al. (2013): maximal random-effects structures for confirmatory testing
+- Matuschek et al. (2017): balance Type I error control and statistical power
+- Practical rule: start from design-justified maximal model, simplify transparently only when needed
 
-### Dummy vs. Contrast Coding
+## Crossed vs nested random effects
 
-- Treatment coding can make slope variance interpretation fragile
-- Use sum/Helmert/custom contrasts for interpretable main effects
+- **Crossed:** same participants see multiple items and conditions
+- **Nested:** lower-level units appear only inside one higher-level unit
+- Misclassification changes uncertainty estimates and inferential validity
+
+## Core lme4 model architecture
 
 ```{r}
 #| eval: false
-contrasts(df$Condition) <- contr.sum(2)
-model <- lmer(rt ~ Condition + (Condition || Subject) + (Condition || Item), data = df)
+library(lme4)
+
+model <- lmer(
+  rt ~ condition * trial_z +
+    (1 + condition * trial_z | subject) +
+    (1 + condition | item),
+  data = df
+)
 ```
 
-## 3) Hands-On Lab: Convergence Crisis Routine
+- Fixed effects capture experimental hypotheses
+- Random effects capture participant/item-level heterogeneity
 
-### Diagnostics
+## Contrast coding and interpretation
 
-- Distinguish singular fit (`boundary (singular) fit`) from non-convergence
-- Inspect variance components and gradient warnings
-
-### Troubleshooting Pipeline
-
-1. Scale/center continuous predictors
-2. Try optimizer and iteration controls
-3. Simplify random effects stepwise and justify each decision
+- Treatment coding can obscure main-effect interpretation in interactions
+- Sum/Helmert/custom contrasts align coefficients with planned hypotheses
 
 ```{r}
 #| eval: false
-df$z_trial <- scale(df$trial, center = TRUE, scale = TRUE)
-model <- lmer(
-  rt ~ Condition * z_trial + (Condition + z_trial | Subject) + (Condition | Item),
+contrasts(df$condition) <- contr.sum(2)
+contrasts(df$group) <- contr.helmert(3)
+```
+
+## Data preparation before fitting
+
+- Center/scale continuous predictors
+- Inspect missing values and impossible values
+- Audit outlier policy and document decisions
+
+```{r}
+#| eval: false
+df$trial_z <- scale(df$trial, center = TRUE, scale = TRUE)
+summary(df)
+```
+
+## Frequent convergence issues
+
+- **Non-convergence:** optimizer cannot find stable solution
+- **Singular fit:** one or more variance components collapse near zero
+- These are not interchangeable warnings and need different responses
+
+## Troubleshooting sequence
+
+1. Check data scaling and model complexity mismatch
+2. Increase optimizer budget / change optimizer
+3. Remove unjustified correlation parameters with `||`
+4. Simplify random slopes stepwise with written justification
+
+```{r}
+#| eval: false
+model_try <- lmer(
+  rt ~ condition * trial_z +
+    (condition + trial_z || subject) +
+    (condition | item),
   data = df,
   control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
 )
 ```
 
-## 4) Reporting & Publication Formatting
+## Comparing random-effects specifications
 
-### Method Section Blueprint
-
-- State fixed effects, random effects, optimizer, and convergence outcomes
-- Document any principled simplification from maximal starting structure
-
-### Extracting Tables
+- Start from theoretically justified maximal architecture
+- Compare with reduced variants only when diagnostics require it
+- Keep a reproducible model log for reviewer transparency
 
 ```{r}
 #| eval: false
-library(modelsummary)
-modelsummary(model, statistic = "conf.int", output = "markdown")
+anova(model_maximal, model_reduced)
 ```
 
-- Alternatives: `sjPlot::tab_model()` for publication-ready tables
+## Interpreting and reporting frequentist models
 
-## Pre-Workshop Assignment
+- Report fixed effects with estimates, SE, test statistic, and intervals
+- Report random-effect structure and convergence outcomes
+- Explicitly state simplification decisions and why they were needed
 
-- Bring a dataset from your own dissertation/project
-- Or bring a target paper to replicate
-- Final 30-minute clinic: draft exact `lme4`/`brms` formulas for each project
+```{r}
+#| eval: false
+library(emmeans)
+library(modelsummary)
+
+modelsummary(model_try, statistic = "conf.int", output = "markdown")
+emmeans(model_try, ~ condition)
+```
+
+## APA-style reporting template
+
+- **Method:** design, coding scheme, model formula, optimizer settings
+- **Results:** fixed effects, uncertainty metrics, random-effects diagnostics
+- **Figures:** effect visualizations and model-based contrasts
+
+## Hands-on activity (guided)
+
+- Apply session workflow to one of your own dissertation variables
+- Draft a candidate maximal model for participants and items
+- Perform one diagnostic cycle and document your decisions
+
+## Preparation for Session 2 (Bayesian)
+
+- Identify one frequentist model from today with unstable/singular behavior
+- Bring the same dataset for Bayesian re-fitting in `brms`
+- Note where priors and alternative likelihoods could improve inference
+
+## Key references
+
+- Barr, D. J., Levy, R., Scheepers, C., & Tily, H. J. (2013). Random effects structure for confirmatory hypothesis testing: Keep it maximal. *Journal of Memory and Language, 68*(3), 255-278.
+- Matuschek, H., Kliegl, R., Vasishth, S., Baayen, H., & Bates, D. (2017). Balancing Type I error and power in linear mixed models. *Journal of Memory and Language, 94*, 305-315.
+- Bates, D., Mächler, M., Bolker, B., & Walker, S. (2015). Fitting linear mixed-effects models using lme4. *Journal of Statistical Software, 67*(1), 1-48.
+
+## Questions and discussion
+
+- Final Q&A and project clinic (last 30 minutes)

@@ -1,92 +1,133 @@
 ---
 title: "Session 2: Bayesian Mixed-Effects Models with brms"
 subtitle: "Data Analysis Workshop 2026"
-author: "Nebrija Workshop"
+author: "Dr. Bernhard Angele"
 format:
   revealjs:
     incremental: true
 ---
 
-## Audience and Goals
+## Session roadmap (3h)
 
-- PhD students in cognitive and experimental psychology
-- Psycholinguistics and education research contexts
-- Goal: practical Bayesian mixed modeling for complex designs
+- **Part 1 (40 min):** Bayesian multilevel fundamentals and prior specification
+- **Part 2 (60 min):** fitting `brms` models for Gaussian and non-Gaussian outcomes
+- **Part 3 (50 min):** convergence diagnostics, posterior checks, and model comparison
+- **Part 4 (30 min):** scientific reporting and final assignment guidance
 
-## 1) Bayesian Paradigm Shift
+## Session goals
 
-### Escaping Singular Fit Failures
+- Translate frequentist mixed models into Bayesian formulations
+- Specify regularizing priors and understand their practical role
+- Fit and interpret `brms` models for RT and ordinal outcomes
+- Produce defensible Bayesian write-ups for peer-reviewed publications
 
-- Bayesian models estimate uncertainty even near zero random-slope variance
-- Regularizing priors prevent pathological boundary behavior
+## Why move from frequentist to Bayesian mixed models?
 
-### Philosophy of Priors
+- Frequentist maximal models often encounter convergence/singularity limits
+- Bayesian estimation can remain stable with weakly informative regularization
+- Posterior inference supports direct probability statements about effects
 
-- Move beyond flat defaults for complex multilevel designs
-- Use weakly informative priors on fixed effects and group-level SDs
+## Frequentist-to-Bayesian mapping
+
+- Formula structure remains familiar (`lme4`-style syntax)
+- Add priors explicitly for fixed effects and variance parameters
+- Evaluate posterior quality (not only point-estimate significance)
+
+## Priors: practical defaults for workshop analyses
 
 ```{r}
 #| eval: false
+library(brms)
+
 priors <- c(
   prior(normal(0, 0.5), class = "b"),
-  prior(exponential(1), class = "sd")
+  prior(exponential(1), class = "sd"),
+  prior(lkj(2), class = "cor")
 )
 ```
 
-## 2) Practical Lab: Custom Response Distributions
+- Priors regularize estimation and reduce extreme, weakly identified solutions
 
-### The Reaction-Time Dilemma
+## Basic Bayesian mixed model
 
-- Avoid arbitrary outlier removal as the primary strategy
-- Avoid reflexive log-transform-only workflows
+```{r}
+#| eval: false
+fit_gaussian <- brm(
+  rt ~ condition + (condition | subject) + (condition | item),
+  data = df,
+  family = gaussian(),
+  prior = priors,
+  chains = 4,
+  cores = 4,
+  iter = 4000
+)
+```
 
-### Alternative Likelihoods
+## Modeling reaction times without over-simplification
+
+- Avoid relying only on aggressive trimming or log transforms
+- Use response distributions adapted to RT skewness
 
 ```{r}
 #| eval: false
 fit_shifted <- brm(
-  rt ~ condition + (condition | p | subject) + (condition | i | item),
+  rt ~ condition + (condition | subject) + (condition | item),
   data = df,
   family = shifted_lognormal(),
   prior = priors
 )
 
 fit_exgaussian <- brm(
-  rt ~ condition + (condition | p | subject) + (condition | i | item),
+  rt ~ condition + (condition | subject) + (condition | item),
   data = df,
   family = exgaussian(),
   prior = priors
 )
 ```
 
-### Ordinal Judgments
+## Ordinal outcomes in cognitive/educational research
 
 ```{r}
 #| eval: false
 fit_ordinal <- brm(
   rating ~ condition + (condition | subject) + (condition | item),
   data = df,
-  family = cumulative(link = "logit")
+  family = cumulative(link = "logit"),
+  prior = priors
 )
 ```
 
-## 3) MCMC Assessment and Convergence
+- Useful for Likert judgments and acceptability ratings
 
-- Target 2026 standard: $\\hat{R} < 1.01$
-- Check ESS and divergent transitions
-- Use trace/density diagnostics and posterior predictive checks
+## MCMC quality checks (minimum standards)
+
+- $\hat{R} < 1.01$
+- Adequate effective sample sizes (bulk and tail ESS)
+- No problematic divergence patterns
 
 ```{r}
 #| eval: false
 summary(fit_shifted)
+plot(fit_shifted)
 pp_check(fit_shifted)
 ```
 
-## 4) Writing Up Bayesian Mixed Models
+## Model adequacy and comparison
 
-- Report posterior means/medians and credible intervals
-- Add directional probabilities, e.g., $P(b > 0)$
-- Optionally include Bayes Factors where justified
+- Posterior predictive checks for distributional fit
+- Compare plausible families (e.g., shifted lognormal vs ex-Gaussian)
+- Use LOO/WAIC or theoretically constrained comparisons where appropriate
+
+```{r}
+#| eval: false
+loo(fit_shifted, fit_exgaussian)
+```
+
+## Interpreting posterior effects
+
+- Report posterior estimates and credible intervals
+- Add directional probabilities, e.g., $P(\beta > 0)$
+- Use visual posterior summaries to support narrative claims
 
 ```{r}
 #| eval: false
@@ -94,11 +135,36 @@ library(tidybayes)
 library(ggplot2)
 
 posterior <- spread_draws(fit_shifted, b_condition)
+mean(posterior$b_condition > 0)
+
 ggplot(posterior, aes(x = b_condition)) +
-  geom_density(fill = "steelblue", alpha = 0.4)
+  geom_density(fill = "steelblue", alpha = 0.4) +
+  labs(x = "Posterior draw: b_condition", y = "Density")
 ```
 
-## Pre-Workshop Assignment and Clinic
+## Bayes factors (when justified)
 
-- Bring a personal dataset or replication target paper
-- Final 30-minute clinic: map dissertation designs to `lme4` or `brms` formulas
+- Bayes factors are prior-sensitive and require explicit prior reporting
+- If used, fit with `sample_prior = "yes"` and report sensitivity checks
+
+```{r}
+#| eval: false
+hypothesis(fit_shifted, "b_condition = 0")
+```
+
+## Writing Bayesian methods and results
+
+- Describe prior rationale, model family, sampling settings, and diagnostics
+- Report posterior summaries and uncertainty clearly
+- Connect model choice to research question and data-generating process
+
+## Final autonomous assignment (2h independent work)
+
+- Choose `lme4` or `brms` with your own data (or provided public dataset)
+- Produce a maximum 1-page results-style report
+- Justify model architecture and interpret key effects
+
+## Closing clinic
+
+- Translate each dissertation project into a concrete analysis plan
+- Identify minimum reproducible reporting elements for submission-ready analyses
