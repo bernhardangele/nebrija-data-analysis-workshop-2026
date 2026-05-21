@@ -136,6 +136,10 @@ library(ggplot2)
 
 posterior <- spread_draws(fit_shifted, b_condition)
 mean(posterior$b_condition > 0)
+
+ggplot(posterior, aes(x = b_condition)) +
+  geom_density(fill = "steelblue", alpha = 0.4) +
+  labs(x = "Posterior draw: b_condition", y = "Density")
 ```
 
 ## Bayes factors (when justified)
