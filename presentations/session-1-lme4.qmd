@@ -1,0 +1,93 @@
+---
+title: "Session 1: Frequentist Mixed-Effects Models with lme4"
+subtitle: "Data Analysis Workshop 2026"
+author: "Nebrija Workshop"
+format:
+  revealjs:
+    incremental: true
+---
+
+## Audience and Goals
+
+- PhD students in cognitive and experimental psychology
+- Psycholinguistics and education research contexts
+- Goal: defensible frequentist mixed-effects workflows in `lme4`
+
+## 1) Design-Model Alignment
+
+### The "Maximal" Debate
+
+- Barr et al. (2013): strict design-model alignment to protect Type I error
+- Matuschek et al. (2017): pragmatic simplification to preserve power
+- Practice: pre-register model architecture and simplification logic
+
+### Crossed vs. Nested Factors
+
+- Crossed: participants see multiple items/lists over conditions
+- Nested: lower-level units only occur within one higher-level grouping
+- Incorrect classification biases uncertainty and inferential claims
+
+## 2) Advanced `lme4` Mechanics & Syntax
+
+### Suppressing Correlations with `||`
+
+- `(Condition || Subject)` fits intercept + slope variances without correlation terms
+- Useful when correlation estimates are unstable or weakly identified
+- Assumes random intercept/slope correlation can be omitted for estimation stability
+
+### Dummy vs. Contrast Coding
+
+- Treatment coding can make slope variance interpretation fragile
+- Use sum/Helmert/custom contrasts for interpretable main effects
+
+```{r}
+#| eval: false
+contrasts(df$Condition) <- contr.sum(2)
+model <- lmer(rt ~ Condition + (Condition || Subject) + (Condition || Item), data = df)
+```
+
+## 3) Hands-On Lab: Convergence Crisis Routine
+
+### Diagnostics
+
+- Distinguish singular fit (`boundary (singular) fit`) from non-convergence
+- Inspect variance components and gradient warnings
+
+### Troubleshooting Pipeline
+
+1. Scale/center continuous predictors
+2. Try optimizer and iteration controls
+3. Simplify random effects stepwise and justify each decision
+
+```{r}
+#| eval: false
+df$z_trial <- scale(df$trial, center = TRUE, scale = TRUE)
+model <- lmer(
+  rt ~ Condition * z_trial + (Condition + z_trial | Subject) + (Condition | Item),
+  data = df,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+```
+
+## 4) Reporting & Publication Formatting
+
+### Method Section Blueprint
+
+- State fixed effects, random effects, optimizer, and convergence outcomes
+- Document any principled simplification from maximal starting structure
+
+### Extracting Tables
+
+```{r}
+#| eval: false
+library(modelsummary)
+modelsummary(model, statistic = "conf.int", output = "markdown")
+```
+
+- Alternatives: `sjPlot::tab_model()` for publication-ready tables
+
+## Pre-Workshop Assignment
+
+- Bring a dataset from your own dissertation/project
+- Or bring a target paper to replicate
+- Final 30-minute clinic: draft exact `lme4`/`brms` formulas for each project
