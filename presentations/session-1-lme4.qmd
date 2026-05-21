@@ -9,156 +9,281 @@ format:
 
 ## Session roadmap (3h)
 
-- **Part 1 (45 min):** design-model alignment and random-effects structures
-- **Part 2 (45 min):** model specification, contrasts, and interpretation
-- **Part 3 (60 min):** convergence/singularity diagnostics and troubleshooting
-- **Part 4 (30 min):** reporting, APA-style write-up, and project clinic
+- **Part 1 (35 min):** dataset, design, and research question
+- **Part 2 (55 min):** preprocessing decisions and exploratory plots
+- **Part 3 (60 min):** model building, diagnostics, and model revision
+- **Part 4 (30 min):** interpretation, reporting, and transition to Bayesian analysis
 
-## Workshop context
+## This session uses one concrete dataset
 
-- Audience: doctoral researchers in cognitive psychology, language, and education
-- Focus: applied, critical, publication-oriented mixed-effects analysis
-- Core software: `lme4`, `lmerTest`, `emmeans`, `ggplot2`
+- Dataset: `analysis-workshop/data/Hindi_new.csv`
+- Paradigm: Hindi eye-tracking during reading
+- Design: 2 × 2 factorial (`writing_system` × `frequency`)
+- Outcome focus for Session 1: first-run dwell time (`IA_FIRST_RUN_DWELL_TIME`)
 
-## Learning objectives for this session
+## Research question for the walkthrough
 
-- Justify complex crossed random-effects structures for participants and items
-- Diagnose and resolve convergence and singular-fit warnings in `lme4`
-- Specify defensible contrasts tied to hypotheses
-- Draft method/results reporting aligned with journal expectations
+Do writing system and lexical frequency influence first-pass reading time, while accounting for participant and item variability?
 
-## Why mixed-effects models?
+- H1: High-frequency targets are read faster
+- H2: Writing system influences processing time
+- H3: Frequency effect may differ by writing system
 
-- Repeated measures violate independence assumptions
-- Participants and stimulus items add crossed random variability
-- Ignoring random structure inflates error rates and weakens generalization
+## Why mixed-effects models here?
 
-## The "keep it maximal" discussion
+- Each participant contributes many trials
+- Each item appears across conditions
+- We need inference that generalizes to new participants and new items
+- This requires crossed random effects, not only fixed-effects ANOVA
 
-- Barr et al. (2013): maximal random-effects structures for confirmatory testing
-- Matuschek et al. (2017): balance Type I error control and statistical power
-- Practical rule: start from design-justified maximal model, simplify transparently only when needed
+## Analysis workflow we will follow
 
-## Crossed vs nested random effects
+1. Load and inspect raw data
+2. Recode factors from `cond_name`
+3. Make explicit cleaning decisions
+4. Visualize distributions and condition means
+5. Fit maximal design-justified model
+6. Diagnose warnings and simplify if needed
+7. Report effects and model decisions transparently
 
-- **Crossed:** same participants see multiple items and conditions
-- **Nested:** lower-level units appear only inside one higher-level unit
-- Misclassification changes uncertainty estimates and inferential validity
-
-## Core lme4 model architecture
+## Step 1: load packages and data
 
 ```{r}
 #| eval: false
+library(tidyverse)
 library(lme4)
+library(lmerTest)
+library(emmeans)
+library(performance)
 
-model <- lmer(
-  rt ~ condition * trial_z +
-    (1 + condition * trial_z | subject) +
-    (1 + condition | item),
-  data = df
-)
+hindi_raw <- read_csv("analysis-workshop/data/Hindi_new.csv")
 ```
 
-- Fixed effects capture experimental hypotheses
-- Random effects capture participant/item-level heterogeneity
-
-## Contrast coding and interpretation
-
-- Treatment coding can obscure main-effect interpretation in interactions
-- Sum/Helmert/custom contrasts align coefficients with planned hypotheses
+## Step 2: inspect raw structure
 
 ```{r}
 #| eval: false
-contrasts(df$condition) <- contr.sum(2)
-contrasts(df$group) <- contr.helmert(3)
+glimpse(hindi_raw)
+summary(hindi_raw$IA_FIRST_RUN_DWELL_TIME)
+table(hindi_raw$cond_name, useNA = "ifany")
 ```
 
-## Data preparation before fitting
+- Check if all four conditions are present (`RL`, `RH`, `TL`, `TH`)
+- Check missingness and implausible values before modeling
 
-- Center/scale continuous predictors
-- Inspect missing values and impossible values
-- Audit outlier policy and document decisions
+## Step 3: recode experimental factors
 
 ```{r}
 #| eval: false
-df$trial_z <- scale(df$trial, center = TRUE, scale = TRUE)
-summary(df)
+hindi <- hindi_raw %>%
+  mutate(
+    subject = factor(RECORDING_SESSION_LABEL),
+    item = factor(stim_num),
+    writing_system = case_when(
+      cond_name %in% c("RL", "RH") ~ "Romance",
+      cond_name %in% c("TL", "TH") ~ "Traditional"
+    ),
+    frequency = case_when(
+      cond_name %in% c("RH", "TH") ~ "High",
+      cond_name %in% c("RL", "TL") ~ "Low"
+    ),
+    writing_system = factor(writing_system),
+    frequency = factor(frequency)
+  )
 ```
 
-## Frequent convergence issues
+## Decision checkpoint A: which rows are valid trials?
 
-- **Non-convergence:** optimizer cannot find stable solution
-- **Singular fit:** one or more variance components collapse near zero
-- These are not interchangeable warnings and need different responses
-
-## Troubleshooting sequence
-
-1. Check data scaling and model complexity mismatch
-2. Increase optimizer budget / change optimizer
-3. Remove unjustified correlation parameters with `||`
-4. Simplify random slopes stepwise with written justification
+- **Decision:** exclude practice trials
+- **Decision:** keep only fixated targets (`IA_SKIP == 0`)
+- **Reason:** practice and skipped targets are not valid for first-pass duration modeling
 
 ```{r}
 #| eval: false
-model_try <- lmer(
-  rt ~ condition * trial_z +
-    (condition + trial_z || subject) +
-    (condition | item),
-  data = df,
+hindi <- hindi %>%
+  filter(practice == "No", IA_SKIP == 0)
+```
+
+## Decision checkpoint B: plausible RT window
+
+- Eye-tracking durations can include sensor/mapping artifacts
+- **Decision:** keep first-run dwell times between 80 and 2000 ms
+- **Reason:** remove implausibly short/long values while keeping realistic cognitive variability
+
+```{r}
+#| eval: false
+hindi <- hindi %>%
+  mutate(
+    frd = if_else(
+      IA_FIRST_RUN_DWELL_TIME >= 80 & IA_FIRST_RUN_DWELL_TIME <= 2000,
+      IA_FIRST_RUN_DWELL_TIME,
+      NA_real_
+    )
+  )
+```
+
+## Audit the impact of cleaning decisions
+
+```{r}
+#| eval: false
+hindi %>%
+  summarise(
+    n_rows = n(),
+    missing_frd = sum(is.na(frd)),
+    missing_rate = mean(is.na(frd))
+  )
+```
+
+- Always report how many observations were excluded and why
+
+## Descriptive statistics by condition
+
+```{r}
+#| eval: false
+hindi %>%
+  group_by(writing_system, frequency) %>%
+  summarise(
+    n = sum(!is.na(frd)),
+    mean_frd = mean(frd, na.rm = TRUE),
+    sd_frd = sd(frd, na.rm = TRUE)
+  )
+```
+
+## Visual check: condition distributions
+
+```{r}
+#| eval: false
+ggplot(hindi, aes(x = writing_system, y = frd, fill = frequency)) +
+  geom_boxplot(outlier.shape = NA, alpha = .5) +
+  geom_jitter(width = .15, alpha = .15, size = .8) +
+  labs(
+    x = "Writing system",
+    y = "First-run dwell time (ms)",
+    fill = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+## Modeling decision C: transform or not?
+
+- Raw dwell times are typically right-skewed
+- We compare:
+  - `frd` model on raw scale
+  - `log_frd` model on log scale
+- **Decision rule:** prefer log model if residual diagnostics improve clearly
+
+```{r}
+#| eval: false
+hindi <- hindi %>% mutate(log_frd = log(frd))
+```
+
+## Contrast coding decision
+
+- With interactions, default treatment coding can obscure main effects
+- **Decision:** use sum coding to interpret main effects as grand-mean deviations
+
+```{r}
+#| eval: false
+contrasts(hindi$writing_system) <- contr.sum(2)
+contrasts(hindi$frequency) <- contr.sum(2)
+```
+
+## Maximal design-justified model
+
+```{r}
+#| eval: false
+m_max <- lmer(
+  log_frd ~ writing_system * frequency +
+    (1 + writing_system * frequency | subject) +
+    (1 + writing_system * frequency | item),
+  data = hindi,
+  REML = FALSE,
   control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
 )
 ```
 
-## Comparing random-effects specifications
+## Typical issue: singular fit
 
-- Start from theoretically justified maximal architecture
-- Compare with reduced variants only when diagnostics require it
-- Keep a reproducible model log for reviewer transparency
-
-```{r}
-#| eval: false
-anova(model_maximal, model_reduced)
-```
-
-## Interpreting and reporting frequentist models
-
-- Report fixed effects with estimates, SE, test statistic, and intervals
-- Report random-effect structure and convergence outcomes
-- Explicitly state simplification decisions and why they were needed
+- In small/medium samples, full random-correlation structures may be overparameterized
+- **Decision:** remove random-effect correlations first (`||`) before dropping slopes
 
 ```{r}
 #| eval: false
-library(emmeans)
-library(modelsummary)
-
-modelsummary(model_try, statistic = "conf.int", output = "markdown")
-emmeans(model_try, ~ condition)
+m_uncor <- lmer(
+  log_frd ~ writing_system * frequency +
+    (1 + writing_system * frequency || subject) +
+    (1 + writing_system * frequency || item),
+  data = hindi,
+  REML = FALSE
+)
 ```
 
-## APA-style reporting template
+## If singularity persists: principled simplification
 
-- **Method:** design, coding scheme, model formula, optimizer settings
-- **Results:** fixed effects, uncertainty metrics, random-effects diagnostics
-- **Figures:** effect visualizations and model-based contrasts
+- Keep slopes directly tied to confirmatory hypotheses
+- Remove weakest/least identifiable slope terms one step at a time
+- Save every model variant and diagnostic result
 
-## Hands-on activity (guided)
+```{r}
+#| eval: false
+m_final <- lmer(
+  log_frd ~ writing_system * frequency +
+    (1 + frequency || subject) +
+    (1 + frequency || item),
+  data = hindi,
+  REML = FALSE
+)
+```
 
-- Apply session workflow to one of your own dissertation variables
-- Draft a candidate maximal model for participants and items
-- Perform one diagnostic cycle and document your decisions
+## Diagnostics checklist for final model
 
-## Preparation for Session 2 (Bayesian)
+```{r}
+#| eval: false
+isSingular(m_final, tol = 1e-4)
+check_model(m_final)
+anova(m_final)
+```
 
-- Identify one frequentist model from today with unstable/singular behavior
-- Bring the same dataset for Bayesian re-fitting in `brms`
-- Note where priors and alternative likelihoods could improve inference
+- Convergence warning absent
+- Singularity status acceptable
+- Residual patterns reasonable for interpretation
+
+## Effect estimation and planned comparisons
+
+```{r}
+#| eval: false
+summary(m_final)
+emmeans(m_final, ~ writing_system * frequency)
+pairs(emmeans(m_final, ~ frequency | writing_system))
+```
+
+## Example decision log (report this in Methods)
+
+1. Excluded practice trials and skipped targets (`IA_SKIP == 1`)
+2. Winsorized by exclusion window (80–2000 ms on first-run dwell)
+3. Used log-transformed dependent variable after skew inspection
+4. Started maximal random structure, simplified by removing correlations first
+5. Retained interaction term because theoretically predicted
+
+## Reporting template (frequentist)
+
+- **Data processing:** exclusion criteria and retained sample size
+- **Model formula:** fixed effects and random-effects structure
+- **Diagnostics:** convergence/singularity and residual checks
+- **Results:** fixed effects (estimate, SE, t, p, CI) + estimated marginal means
+- **Transparency:** what was tried and why final model was chosen
+
+## Bridge to Session 2 (Bayesian)
+
+- We will keep the **same dataset and research question**
+- We will revisit key decisions:
+  - likelihood family
+  - random-effects regularization
+  - interpretation of uncertainty
+- This makes frequentist vs Bayesian choices directly comparable
 
 ## Key references
 
 - Barr, D. J., Levy, R., Scheepers, C., & Tily, H. J. (2013). Random effects structure for confirmatory hypothesis testing: Keep it maximal. *Journal of Memory and Language, 68*(3), 255-278.
 - Matuschek, H., Kliegl, R., Vasishth, S., Baayen, H., & Bates, D. (2017). Balancing Type I error and power in linear mixed models. *Journal of Memory and Language, 94*, 305-315.
 - Bates, D., Mächler, M., Bolker, B., & Walker, S. (2015). Fitting linear mixed-effects models using lme4. *Journal of Statistical Software, 67*(1), 1-48.
-
-## Questions and discussion
-
-- Final Q&A and project clinic (last 30 minutes)
