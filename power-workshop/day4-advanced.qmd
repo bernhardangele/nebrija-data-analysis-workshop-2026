@@ -1,0 +1,278 @@
+---
+title: "Day 4: Advanced Topics in Power Analysis"
+subtitle: "Reporting power analysis results, multiple comparisons, and Bayesian methods"
+author: "Power Workshop"
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    chalkboard: true
+    preview-links: auto
+    footer: "Day 4: Reporting power, multiple comparisons, and Bayesian methods"
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+# Reporting simr analyses
+
+## Example text {.smaller}
+
+> "In order to determine the required sample size for our mixed-effects
+> model, we conducted a power analysis using the `simr` package in R
+> (Green & MacLeod, 2016). We based our simulations an existing dataset
+> involving a gaze-contingent boundary study (Experiment 2 of Angele et
+> al., 2013) with 40 subjects and 120 items. Experiment 2 in Angele et
+> al. (2013) had five different preview conditions. As our study only
+> has two preview conditions, we simplified the Angele et al. data by
+> eliminating all conditions except for the correct and the repeated
+> preview conditions, fitting a linear mixed-effects model with preview
+> as a fixed effect and random intercepts for subjects and items for
+> each dependent variable. Our analysis suggested that a sample size of
+> 50 subjects and 120 items would provide approximately 80% power to
+> detect a 10 ms preview effect at an alpha level of 0.05."
+
+# Brysbart & Stevens (2018): The rule-of-thumb approach to sample size
+
+## Brysbaert & Stevens (2018)
+
+-   Problem: Large standard deviations in reaction time data lead to
+    small effect sizes
+    -   This is true for eye movement measures as well
+    -   Standardized effect sizes (Cohen's d) are often around 0.1
+    -   Rule of thumb: 1600 observations per condition should be enough
+        to detect small effects (d = 0.1) with 80% power in RT data
+    -   Even better if you can increase to 3200 observations per
+        condition
+
+# Multiple Comparisons
+
+## The Problem
+
+When we perform multiple statistical tests:
+
+-   Each test has an α = 0.05 chance of Type I error
+-   With 20 tests, we expect 1 false positive on average!
+-   Family-wise error rate (FWER) inflates with more tests
+
+$$P(\text{at least one Type I error}) = 1 - (1-\alpha)^m$$
+
+## Example: Multiple Tests
+
+```{r}
+#| label: setup
+
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(ggplot2)
+library(emmeans)
+# install.packages("brms")
+library(tidyverse)
+library(brms)
+set.seed(123)
+
+# Number of tests and alpha
+m <- 20
+alpha <- 0.05
+
+# Probability of at least one Type I error
+fwer <- 1 - (1 - alpha)^m
+cat("FWER with", m, "tests:", round(fwer, 3))
+```
+
+## Visualizing FWER
+
+```{r}
+#| label: fwer-viz
+#| fig-width: 8
+#| fig-height: 5
+#| output-location: slide
+n_tests <- 1:50
+fwer_vals <- 1 - (1 - 0.05)^n_tests
+
+plot(n_tests, fwer_vals, type = "l", lwd = 2,
+     xlab = "Number of Tests", ylab = "FWER",
+     main = "Family-Wise Error Rate Inflation")
+abline(h = 0.05, lty = 2, col = "red")
+abline(h = 0.50, lty = 2, col = "blue")
+```
+
+## Is this true for eye movements?
+
+-   von der Malsburg & Angele (2017) examined FWER in eye-tracking data
+
+    ![](figure_power-by-criterion-1.png){width="432"}
+
+-   No correction for multiple comparisons leads to false positives,
+    Bonferroni correction performs best in terms of power.
+
+## Bonferroni Correction
+
+Divide α by number of tests.
+
+$$\alpha_{adjusted} = \frac{\alpha}{m}$$
+
+```{r}
+#| label: bonferroni
+# Adjusted alpha for 20 tests
+m <- 20
+alpha_adjusted <- 0.05 / m
+cat("Adjusted alpha:", alpha_adjusted)
+```
+
+## Bonferroni: Pros and Cons
+
+**Pros:** - Simple to apply - Controls FWER strongly
+
+**Cons:** - Very conservative (loses power) - Assumes tests are
+independent
+
+## Holm-Bonferroni Method
+
+Step-down procedure (less conservative):
+
+1.  Order p-values from smallest to largest
+2.  Compare smallest p to α/m
+3.  If significant, compare next to α/(m-1)
+4.  Continue until a test is non-significant
+
+```{r}
+#| label: holm
+#| output-location: slide
+# Example p-values
+p_values <- c(0.001, 0.008, 0.039, 0.041, 0.042, 0.06, 0.12, 0.15)
+
+# Apply corrections
+p.adjust(p_values, method = "bonferroni")
+p.adjust(p_values, method = "holm")
+```
+
+## False Discovery Rate (FDR)
+
+Benjamini-Hochberg procedure:
+
+-   Controls the **expected proportion** of false discoveries
+-   Less conservative than FWER methods
+-   More appropriate when some false positives are acceptable
+
+```{r}
+#| label: fdr
+#| output-location: slide
+# FDR correction
+p.adjust(p_values, method = "BH")
+```
+
+## Comparison of Methods
+
+```{r}
+#| label: compare-methods
+#| output-location: slide
+methods <- c("none", "bonferroni", "holm", "BH")
+results <- sapply(methods, function(m) {
+  if (m == "none") return(p_values)
+  p.adjust(p_values, method = m)
+})
+
+data.frame(
+  raw = p_values,
+  bonferroni = results[, "bonferroni"],
+  holm = results[, "holm"],
+  BH = results[, "BH"]
+)
+```
+
+# Using brms for Bayesian Analysis
+
+## Introduction to brms
+
+**brms** (Bayesian Regression Models using Stan):
+
+-   Fits Bayesian multilevel models
+-   Similar syntax to lme4
+-   Powerful and flexible
+
+
+## Setting Priors
+
+```{r}
+#| label: priors
+#| eval: false
+# Weakly informative priors
+priors_gaussian <- c(set_prior("normal(0,1)", class = "b"))
+```
+
+## Run model {.scrollable}
+
+```{r}
+#| label: brms-intro
+#| echo: true
+#| cache: true
+#| output-location: slide
+
+
+
+exp2 <- read_csv("angele_et_al_2013_experiment_2.csv")
+
+exp2$preview <- as.factor(exp2$preview)
+
+priors_gaussian <- c(set_prior("normal(0,250)", class = "b"))
+ 
+model_brms <-
+  brm(
+    data = exp2,
+    formula = bf(
+      gzd_n1 ~ preview + 
+                     (preview | subject) +
+                     (preview | item)),
+    warmup = 1000,
+    iter = 5000,
+    chains = 4,
+    prior = priors_gaussian,
+    sample_prior = "yes",
+    family = gaussian(),
+    #init = "0",
+    control = list(adapt_delta = 0.8),#, max_treedepth = 15),
+    cores = 4,
+    silent = 0
+  ) 
+
+summary(model_brms)
+
+```
+## How to report {.smaller}
+
+-   Report posterior means and 95% credible intervals. An effect can be considered "credible" if the 95% credible interval does not include zero.
+-   Example: "We observed a mean difference of `r fixef(model_brms)["previewrepeated", "Estimate"]` ms (95% CI: `r fixef(model_brms)["previewrepeated", "Q2.5"]` to `r fixef(model_brms)["previewrepeated", "Q97.5"]` ms) between the correct and repeated preview conditions. We also observed a credible difference between the identical and orthographic preview conditions (mean difference = `r fixef(model_brms)["previeworthographic", "Estimate"]` ms, 95% CI: `r fixef(model_brms)["previeworthographic", "Q2.5"]` to `r fixef(model_brms)["previeworthographic", "Q97.5"]` ms). The 95% credible intervals for all other comparisons included 0."
+
+## Bayes Factors
+
+Alternative to null hypothesis testing:
+
+$$BF_{10} = \frac{P(data | H_1)}{P(data | H_0)}$$
+
+Interpretation: - BF \> 3: Moderate evidence for H₁ - BF \> 10: Strong
+evidence - BF \> 100: Decisive evidence
+
+## Use hypothesis in brms to get Bayes Factors
+- Important: Model must be fit with `sample_prior = "yes"`
+
+```{r}
+#| label: bayes-factors
+#| output-location: slide
+hyp1 <- hypothesis(model_brms, "previewrepeated = 0")
+hyp2 <- hypothesis(model_brms, "previeworthographic = 0")
+hyp1
+hyp2
+```
+- Important: Bayes factors depend on the prior specification!
+- Hypothesis command gives BF01 (evidence for H0 over H1), not BF10 (need to use reciprocal)
+
+## Example interpretation:
+
+"The Bayes factor (BF10) for the repeated preview condition compared to zero was `r 1/hyp1$hypothesis$Evid.Ratio`, indicating anecdotal evidence in support of the null hypothesis. The Bayes factor for the orthographic preview condition was `r 1/hyp2$hypothesis$Evid.Ratio`, also indicating anecdotal evidence in support of the null hypothesis."

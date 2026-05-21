@@ -1,0 +1,338 @@
+---
+title: "Day 3: Using simr"
+subtitle: "Power Analysis for Mixed-Effects Models"
+author: "Power Workshop"
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    chalkboard: true
+    preview-links: auto
+    footer: "Day 3: Using simr"
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+---
+
+# Introduction to simr
+
+## What is simr?
+
+**simr** is an R package specifically designed for power analysis of mixed-effects models fitted with lme4.
+
+Key features:
+
+- Works directly with lmer/glmer objects
+- Automated simulation-based power analysis
+- Power curves across parameter ranges
+- Sample size recommendations
+
+## Installation and Setup
+
+```{r}
+#| label: setup
+# install.packages("simr")
+library(tidyverse)
+library(simr)
+library(lme4)
+library(lmerTest)
+library(conflicted)
+conflict_prefer("fixed", "simr")
+conflict_prefer("lmer", "lmerTest")
+conflicts_prefer(simr::getData)
+set.seed(123)
+```
+
+## The simr Workflow
+
+1. **Create or fit** a model with your expected parameters
+2. **Specify** the effect of interest
+3. **Run** power simulations
+4. **Extend** to create power curves
+5. **Find** optimal sample size
+
+# Part 1: Basic Power Analysis with simr
+
+## Get data from Angele et al. (2013) {.scrollable}
+
+```{r}
+#| label: load data and fit model
+#| output-location: slide
+
+exp2 <- read_csv("angele_et_al_2013_experiment_2.csv")
+
+exp2$preview <- factor(exp2$preview, levels = c("correct", "repeated", "orthographic", "semantic", "unrelated"))
+contrasts(exp2$preview) <- contr.treatment
+model_treatment <- lmer(gzd_n1 ~ preview + 
+                          (1  | subject) + 
+                          (1 | item), 
+                        data = exp2)
+summary(model_treatment)
+
+```
+
+## Simplify Angele et al. dataset {.scrollable}
+
+```{r}
+#| label: simplify-data
+#| output-location: slide
+
+# use only identical and repeated preview conditions
+
+simplified_exp2 <- subset(exp2, preview %in% c("correct", "repeated"))
+simplified_exp2$preview <- factor(simplified_exp2$preview, levels = c("correct", "repeated"))
+
+# Fit the model
+model <- lmer(ffd_n1 ~ preview + (1  | subject) + (1 | item), 
+              data = simplified_exp2)
+
+summary(model)
+anova(model)
+```
+
+## Checking Fixed Effects
+
+```{r}
+#| label: check-fixef
+# View current fixed effects
+fixef(model)
+```
+
+## Setting the Effect Size
+
+```{r}
+#| label: set-effect
+# Set the effect size for power analysis
+# This changes the coefficient for condition
+fixef(model)["previewrepeated"] <- 10  # 30ms effect
+
+# Verify
+fixef(model)
+```
+
+## Running Power Simulation
+  
+```{r}
+#| label: power-sim
+#| output-location: slide
+#| message: false
+#| warning: false
+#| cache: true
+# Run power simulation
+
+power_result <- powerSim(model, test = fixed("previewrepeated", "t"), nsim = 100, progress = FALSE)
+power_result
+
+power_result_anova <- powerSim(model, test = fixed("preview", "anova"), nsim = 100, progress = FALSE)
+power_result_anova
+```
+
+## Understanding the Output
+
+The output shows:
+
+- **Power estimate** with confidence interval
+- **Number of simulations** (nsim)
+- **Effect tested** (fixed effect of condition)
+- **Warnings/Errors** (e.g., convergence issues)
+
+# Part 2: Power Curves
+
+## Extending Sample Size
+
+```{r}
+#| label: extend-subjects
+# Extend to more subjects
+model_extended <- extend(model, along = "subject", n = 60)
+
+# Check the new data dimensions
+nrow(getData(model_extended))
+```
+
+## Creating a Power Curve (Subjects)
+
+```{r}
+#| label: power-curve-subjects
+#| cache: true
+#| fig-width: 8
+#| fig-height: 5
+#| output-location: slide
+# Power curve across subject sample sizes
+power_curve_subj <- powerCurve(model_extended, 
+                                test = fixed("preview"),
+                                along = "subject",
+                                breaks = c(10, 15, 20, 25, 30, 40, 50, 60),
+                                nsim = 100,
+                               progress=FALSE)
+
+plot(power_curve_subj)
+```
+
+## Power Curve Details
+
+```{r}
+#| label: power-curve-details
+print(power_curve_subj)
+```
+
+## Extending Items
+
+```{r}
+#| label: extend-items
+# Extend to more items
+model_ext_items <- extend(model, along = "item", n = 200)
+
+# Check new structure
+length(unique(getData(model_ext_items)$item))
+```
+
+## Power Curve for Items
+
+```{r}
+#| label: power-curve-items
+#| cache: true
+#| fig-width: 8
+#| fig-height: 5
+power_curve_items <- powerCurve(model_ext_items,
+                                 test = fixed("preview"),
+                                 along = "item",
+                                 breaks = c(8, 12, 16, 20, 24, 40, 80, 120, 160, 200),
+                                 nsim = 100,
+                                progress = FALSE)
+
+plot(power_curve_items)
+```
+
+# Part 3: Modifying Model Parameters
+
+## Changing Variance Components
+
+```{r}
+#| label: change-variance
+# View current variance components
+VarCorr(model)
+
+# Modify the residual SD
+model_modified <- model
+sigma(model_modified)
+sigma(model_modified) <- 150  # Increase residual SD
+```
+
+## Using makeLmer for Custom Models {.scrollable}
+
+```{r}
+#| label: makeLmer
+#| output-location: slide
+# Create a model with specific parameters
+# subject random effects: intercept SD = 50, slope SD = 20, correlation = 0.2
+# item random effects: intercept SD = 30
+
+cov_matrix <- matrix(c(2500, 200, 200, 400), nrow = 2)
+
+model_custom <- makeLmer(
+  fix_time ~ condition + (1 + condition | subject) + (1 | item),
+  fixef = c(250, 30),                    # Intercept, condition effect
+  VarCorr = list(
+    item = 900,                                     # Item variance,
+    subject = cov_matrix                            # Subject variance-covariance
+  ),
+  sigma = 80,                             # Residual SD
+  data = exp2
+)
+
+summary(model_custom)
+```
+
+## Power with Custom Model
+
+```{r}
+#| label: power-custom
+#| cache: true
+#| message: false
+power_custom <- powerSim(model_custom, 
+                         test = fixed("condition", "t"), 
+                         nsim = 10, progress=FALSE)
+power_custom
+```
+
+## Sensitivity Analysis
+
+```{r}
+#| label: sensitivity
+#| cache: true
+#| output-location: slide
+# Test different effect sizes
+effect_sizes <- c(1, 2, 5, 10, 15, 20, 25)
+power_by_effect <- sapply(effect_sizes, function(eff) {
+  model_temp <- model
+  fixef(model_temp)["previewrepeated"] <- eff
+  result <- powerSim(model_temp, test = fixed("previewrepeated", "t"), nsim = 50, progress = FALSE)
+  summary(result)$mean
+})
+
+data.frame(effect_size = effect_sizes, power = round(power_by_effect, 3))
+```
+
+## Test full model with all 5 preview conditions {.scrollable}
+
+```{r}
+#| label: full-model
+#| cache: true
+#| output-location: slide
+# Fit full model
+model_full <- lmer(ffd_n1 ~ preview + (1  | subject) + (1 | item), 
+                   data = exp2)
+
+
+fixef(model_full)["previewrepeated"] <- -10  # 10ms effect
+fixef(model_full)["previewunrelated"] <- 5  # 5 ms effect
+# power simulation
+
+power_full_repeated <- powerSim(model_full, test = fixed("previewrepeated", "t"), nsim = 100, progress = FALSE)
+power_full_repeated
+
+power_full_unrelated <- powerSim(model_full, test = fixed("previewunrelated", "t"), nsim = 100, progress = FALSE)
+power_full_unrelated
+
+power_anova_full <- powerSim(model_full, test = fixed("preview", "anova"), nsim = 100, progress = FALSE)
+power_anova_full
+
+```
+
+
+# Part 4: Testing Different Effects
+
+
+## Testing Interactions {.scrollable}
+
+```{r}
+#| label: interaction-setup
+#| cache: true
+#| output-location: slide
+# Add another factor
+
+exp2$pre_skip <- factor(exp2$pre_skip, levels = c("skipped", "not skipped"), labels = c("skipped", "not_skipped"))
+
+model_interaction <- lmer(ffd_n1 ~ preview * pre_skip + (1  | subject) + (1 | item), 
+                   data = exp2)
+
+fixef(model_interaction)["previewrepeated:pre_skipnot_skipped"] <- -15  # 15ms interaction effect
+
+# power curve for interaction
+extended_model_int <- extend(model_interaction, along = "subject", n = 100)
+
+powerSim(model_interaction, 
+         test = fixed("previewrepeated:pre_skipnot_skipped", "t"),
+         nsim = 100, progress = FALSE)
+
+power_curve_ext_int <- powerCurve(extended_model_int,
+            test = fixed("previewrepeated:pre_skipnot_skipped", "t"),
+            along = "subject",
+            breaks = c(10, 20, 30, 40, 50, 60, 80, 100),
+            nsim = 100,
+            progress = FALSE)
+
+plot(power_curve_ext_int)
+```

@@ -1,0 +1,997 @@
+---
+title: "Introduction to Linear Mixed Models (LMMs) with R"
+author: "Analysis Workshop"
+format: 
+  revealjs:
+    theme: default
+    slide-number: true
+    chalkboard: true
+    preview-links: auto
+bibliography: references.bib
+---
+
+## Overview
+
+1. Analyzing eye-tracking data: Why do we need linear mixed models?
+2. Reading the data and data exploration
+3. Fitting linear mixed models: 
+     - Hindi eye-tracking experiment: Factorial design analysis
+     - RASTROS corpus: Continuous predictor analysis
+4. Reporting results
+5. Random slopes
+6. Power and multiple comparisons
+
+## What are Linear Mixed Models?
+
+Linear Mixed Models (LMMs) are statistical models that:
+
+-   Account for **fixed effects** (predictors of interest)
+-   Account for **random effects** (sources of variability)
+-   Handle **repeated measures** and **nested data**
+-   Model **hierarchical structures** (e.g., subjects, groups)
+
+Common applications: psychology, neuroscience, medicine, ecology
+
+# Part 1: Data Exploration
+
+## Loading Libraries
+
+```{r setup, message=FALSE, warning=FALSE}
+# Load required packages
+library(tidyverse)      # Data manipulation and visualization
+library(lme4)           # Linear mixed models
+library(lmerTest)       # P-values for mixed models
+library(ggpp)
+library(ggdist)       # Raincloud plots
+library(broom.mixed)    # Tidy model outputs
+library(gt)            # Pretty tables
+```
+
+## Reading the Data
+
+We have two eye-tracking datasets:
+
+1.  **Hindi_new.csv**: Reading time data with factorial design (romance/traditional × frequency)
+2.  **RASTROS_sample.csv**: Portuguese reading data with word frequency predictor
+
+```{r read-data}
+#| echo: true
+# Download data files from Google Drive if not already present
+# If this does not work, please take the files from the email you were sent and put them in the data/ folder manually
+source("download_data.R")
+download_workshop_data()
+
+# Read Hindi eye-tracking data
+hindi_data <- read_csv("data/Hindi_new.csv")
+
+# Read Portuguese (RASTROS) eye-tracking data
+rastros_data <- read_csv("data/RASTROS_sample.csv")
+```
+
+## Exploring Hindi Data {.scrollable}
+
+```{r explore-hindi}
+# Check structure
+glimpse(hindi_data)
+```
+## Exploring Hindi Data: Summary {.scrollable}
+```{r read-hindi-data, message=FALSE}
+#| echo: true
+
+summary(hindi_data)
+```
+
+## Conditions and observations
+
+- Is the design balanced (same number of observations in each condition)?
+```{r hindi-condition-names}
+#| echo: true
+# Check condition names
+table(hindi_data$cond_name)
+```
+
+## Separate factors
+```{r hindi-condition-separate-factors}
+#| echo: true
+# make the names more human-readable and separate the two factors
+hindi_data <- hindi_data %>%
+  mutate(
+    writing_system = case_when(
+      cond_name == "RH" ~ "Romance",
+      cond_name == "RL" ~ "Romance",
+      cond_name == "TH" ~ "Traditional",
+      cond_name == "TL" ~ "Traditional"
+    ),
+    frequency = case_when(
+      cond_name == "RH" ~ "High",
+      cond_name == "RL" ~ "Low",
+      cond_name == "TH" ~ "High",
+      cond_name == "TL" ~ "Low"
+    )
+  )
+with(hindi_data, table(writing_system, frequency))
+```
+
+## Descriptive Statistics - Hindi Data
+
+```{r descriptives-hindi}
+#| echo: true
+#| output-location: slide
+# Summary statistics by condition
+hindi_data %>%
+  group_by(writing_system, frequency) %>%
+  summarise(
+    n = n(),
+    mean_ffd = mean(IA_FIRST_FIXATION_DURATION, na.rm = TRUE),
+    sd_ffd = sd(IA_FIRST_FIXATION_DURATION, na.rm = TRUE),
+    mean_gd = mean(IA_FIRST_RUN_DWELL_TIME, na.rm = TRUE),
+    sd_gd = sd(IA_FIRST_RUN_DWELL_TIME, na.rm = TRUE),
+    mean_tvt = mean(IA_DWELL_TIME, na.rm = TRUE),
+    sd_tvt = sd(IA_DWELL_TIME, na.rm = TRUE)
+  ) %>% 
+  gt::gt() %>%
+ # round fixation times to whole numbers
+  fmt_number(
+    columns = c(mean_ffd, sd_ffd, mean_gd, sd_gd, mean_tvt, sd_tvt),
+    decimals = 0
+  )
+```
+
+## Raincloud Plot - Hindi Data (FFD)
+
+```{r hindi-raincloud-ffd}
+#| echo: true
+#| fig.width: 10
+#| fig.height: 6
+#| figure-caption: "Raincloud Plot: First Fixation Duration by Condition. Boxplot shows median and interquartile range; dots represent individual observations. Black diamonds indicate means."
+#| output-location: slide
+
+
+hindi_data %>% ggplot(aes(x = cond_name, 
+                          y = IA_FIRST_FIXATION_DURATION, 
+                          fill = cond_name)) +
+  
+  # --- The "Cloud"
+  # justification = -0.2 moves it to the RIGHT side.
+  stat_slab(
+    adjust = 0.5,
+    width = 0.6,
+    justification = -0.2, 
+    scale = .4,
+    alpha = 0.6
+  ) +
+
+  # The "rain" -- each dot is an observation
+  # justification = 1.1 pushes it slightly away from the center boxplot.
+  stat_dots(
+    side = "left", 
+    justification = 1.1, 
+    binwidth = NA,  # NA = auto-binning (beeswarm style). Set specific number for stricter bins.
+    overflow = "compress", 
+    alpha = 0.5,
+    size = 0.8,
+    scale=0.4,
+    aes(color = cond_name)
+  ) +
+  
+  # Boxplot
+  geom_boxplot(
+    width = 0.1, 
+    alpha = 0.5, 
+    notch = FALSE,
+    outlier.shape = NA
+  ) +
+  # Means
+  stat_summary(
+    fun = mean, 
+    geom = "point", 
+    shape = 18,      # 18 is a filled diamond
+    size = 4,        # Make it large enough to stand out
+    color = "black"  # Black provides good contrast against colored fills
+  ) +
+  # Axis lables, theme
+  labs(
+    title = "Raincloud Plot: FFD",
+    x = "Condition",
+    y = "First Fixation Duration (ms)"
+  ) +
+  theme_minimal() +
+  # legend is not needed since colors are redundant with x position
+  theme(legend.position = "none")
+```
+## Raincloud Plot -- Frequency effect in FFD {.scrollable}
+
+```{r hindi-raincloud-frequency-as-fill}
+#| echo: true
+#| output-location: slide
+#| fig.width: 10
+#| fig.height: 6
+ggplot(hindi_data, aes(x = writing_system, y = IA_FIRST_FIXATION_DURATION, fill = frequency)) +
+  # The "Cloud"
+  stat_slab(
+    adjust = 0.5,
+    width = 0.6,
+    justification = -0.2, 
+    scale = .4,
+    alpha = 0.6
+  ) +
+  # The "rain" -- each dot is an observation
+  stat_dots(
+    side = "left", 
+    justification = 1.1, 
+    binwidth = NA,  # NA = auto-binning (beeswarm style). Set specific number for stricter bins.
+    overflow = "compress", 
+    alpha = 0.5,
+    size = 0.8,
+    scale=0.4,
+    aes(color = frequency)
+  ) +
+  # Boxplot
+  geom_boxplot(
+    width = 0.1, 
+    alpha = 0.5, 
+    notch = FALSE,
+    outlier.shape = NA
+  ) +
+  # Means
+  stat_summary(
+    fun = mean,
+    position = position_dodge(width = 0.1),  # Adjust position to avoid overlap
+    geom = "point", 
+    shape = 18,      # 18 is a filled diamond
+    size = 4,        # Make it large enough to stand out
+    aes(color = frequency)  # Make them match the dot colors
+  ) +
+  # Axis lables, theme
+  labs(
+    title = "Raincloud Plot: First Fixation Duration by Writing System and Frequency",
+    x = "Writing System",
+    y = "First Fixation Duration (ms)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+```
+
+## Raincloud Plot - Hindi Data (Total viewing time) {.scrollable}
+
+```{r hindi-raincloud-dwell-time}
+#| echo: true
+#| fig.width: 10
+#| fig.height: 6
+#| figure-caption: "Raincloud Plot: Total Viewing Time by Condition. Boxplot shows median and interquartile range; dots represent individual observations. Black diamonds indicate means."
+#| output-location: slide
+ggplot(hindi_data, aes(x = cond_name, y = IA_DWELL_TIME, fill = cond_name)) +
+  
+  # justification = -0.2 moves it to the RIGHT side.
+  stat_slab(
+    adjust = 0.5,
+    width = 0.6,
+    justification = -0.2, 
+    scale = .4,
+    alpha = 0.6
+  ) +
+
+  # justification = 1.1 pushes it slightly away from the center boxplot.
+  stat_dots(
+    side = "left", 
+    justification = 1.1, 
+    binwidth = NA,  # NA = auto-binning (beeswarm style). Set specific number for stricter bins.
+    overflow = "compress", 
+    alpha = 0.5,
+    size = 0.8,
+    scale=0.4,
+    aes(color = cond_name)
+  ) +
+  
+  # Boxplot
+  geom_boxplot(
+    width = 0.1, 
+    alpha = 0.5, 
+    notch = FALSE,
+    outlier.shape = NA
+  ) +
+  
+  # Axis lables, theme
+  labs(
+    title = "Raincloud Plot: Total viewing time",
+    x = "Condition",
+    y = "Total viewing time (ms)"
+  ) +
+  theme_minimal() +
+  # legend is not needed since colors are redundant with x position
+  theme(legend.position = "none")
+```
+
+## Removing outliers
+
+- We seem to have a few 0s in the total viewing time data
+- There are also some very long total viewing times. 
+- We should eliminate very long times, maybe with a cutoff at 2000
+
+```{r remove-zeros-dwell-time}
+#| echo: true
+# Remove 0 and very long dwell time values by setting them to NA
+hindi_data_clean <- hindi_data %>%
+  mutate(IA_DWELL_TIME  = if_else(condition = IA_DWELL_TIME > 0 & IA_DWELL_TIME < 2000,
+                                 true = IA_DWELL_TIME, 
+                                 false = NA))
+
+```
+
+## Frequency effect in TVT {.scrollable}
+
+```{r hindi-raincloud-frequency-as-fill-tvt}
+#| echo: true
+#| output-location: slide
+#| fig.width: 10
+#| fig.height: 6
+ggplot(hindi_data_clean, aes(x = writing_system, y = IA_DWELL_TIME, fill = frequency)) +
+  # The "Cloud"
+  stat_slab(
+    adjust = 0.5,
+    width = 0.6,
+    justification = -0.2, 
+    scale = .4,
+    alpha = 0.6
+  ) +
+  # The "rain" -- each dot is an observation
+  stat_dots(
+    side = "left", 
+    justification = 1.1, 
+    binwidth = NA,  # NA = auto-binning (beeswarm style). Set specific number for stricter bins.
+    overflow = "compress", 
+    alpha = 0.5,
+    size = 0.8,
+    scale=0.4,
+    aes(color = frequency)
+  ) +
+  # Boxplot
+  geom_boxplot(
+    width = 0.1, 
+    alpha = 0.5, 
+    notch = FALSE,
+    outlier.shape = NA
+  ) +
+  # Means
+  stat_summary(
+    fun = mean,
+    position = position_dodge(width = 0.1),  # Adjust position to avoid overlap
+    geom = "point", 
+    shape = 18,      # 18 is a filled diamond
+    size = 4,        # Make it large enough to stand out
+    aes(color = frequency)  # Make them match the dot colors
+  ) +
+  # Axis lables, theme
+  labs(
+    title = "Raincloud Plot: TVT by Writing System and Frequency",
+    x = "Writing System",
+    y = "TVT (ms)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+```
+
+## Exploring RASTROS Data
+
+```{r explore-rastros-glimplse}
+#| echo: true
+#| output-location: slide
+# Check structure
+glimpse(rastros_data)
+```
+
+## Exploring RASTROS Data (summary)
+
+```{r explore-rastros-summary}
+#| echo: true
+#| output-location: slide
+summary(rastros_data)
+```
+## Cleaning up
+- We have some very high gaze durations (IA_FIRST_RUN_DWELL_TIME)
+- Also, the frequency distribution is strange -- what are the zero values?
+- Look at density
+
+```{r plot-Freq_Brasileiro_log}
+#| echo: true
+#| output-location: slide
+rastros_data %>%
+  ggplot(aes(x = Freq_Brasileiro_log)) +
+  geom_density(fill = "lightblue", alpha = 0.7) +
+  labs(
+    title = "Density Plot of Freq_Brasileiro_log",
+    x = "Freq_Brasileiro_log",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+
+## Examining 0s
+
+```{r examine-zeros}
+#| echo: true
+#| output-location: slide
+# table with all 0 values
+
+rastros_data %>%
+  filter(Freq_Brasileiro_log == 0) %>%
+  head(10)
+```
+
+## Cleaning data
+
+- We will words remove with 0 frequency values from the data
+- We will also set those gaze durations with 0 values and those with values equal to or greater than 1200 ms to NA
+
+```{r clean-rastros-data}
+#| echo: true
+
+rastros_clean <- rastros_data %>%
+  filter(Freq_Brasileiro_log > 0) %>%
+  mutate(IA_FIRST_RUN_DWELL_TIME = if_else(condition = IA_FIRST_RUN_DWELL_TIME > 0 & IA_FIRST_RUN_DWELL_TIME < 1200,
+                                          true = IA_FIRST_RUN_DWELL_TIME, 
+                                          false = NA)
+  )
+
+```
+
+## Descriptive Statistics - RASTROS Data
+
+```{r descriptives-rastros}
+#| echo: true
+#| output-location: slide
+#| 
+# add frequency bins for plot
+
+rastros_clean <- rastros_clean %>%
+  mutate(freq_bin = cut(Freq_Brasileiro_log, breaks = 5, labels = c("Very Low", "Low", "Medium", "High", "Very High")))
+
+# Summary statistics 
+rastros_clean %>%
+  group_by(freq_bin) %>%
+  summarise(
+    n = n(),
+    mean_ffd = mean(IA_FIRST_FIXATION_DURATION, na.rm = TRUE),
+    sd_ffd = sd(IA_FIRST_FIXATION_DURATION, na.rm = TRUE),
+    mean_gd = mean(IA_FIRST_RUN_DWELL_TIME, na.rm = TRUE),
+    sd_gd = sd(IA_FIRST_RUN_DWELL_TIME, na.rm = TRUE),
+    mean_freq = mean(Freq_Brasileiro_log, na.rm = TRUE),
+    sd_freq = sd(Freq_Brasileiro_log, na.rm = TRUE)
+  ) %>% gt() %>%
+  fmt_number(
+    columns = c(mean_ffd, sd_ffd, mean_gd, sd_gd),
+    decimals = 0
+  ) %>%
+  fmt_number(
+    columns = c(mean_freq, sd_freq),
+    decimals = 2
+  )
+```
+
+
+## RASTROS Data: FFD raincloud plot {.scrollable}
+
+```{r raincloud-rastros}
+#| fig.width: 10
+#| fig.height: 6
+#| echo: true
+#| figure-caption: "Raincloud Plot: RASTROS data, FFD by Word Frequency (binned). Boxplot shows median and interquartile range; dots represent individual observations. Black diamonds indicate means."
+#| output-location: slide
+
+# Create frequency bins for visualization
+ggplot(rastros_clean, aes(x = freq_bin, y = IA_FIRST_FIXATION_DURATION, fill = freq_bin)) +
+  
+  stat_slab(
+    side = "right", 
+    scale = 0.5,          # Constrain height to prevent overlap
+    justification = -0.2, # Push slightly right
+    alpha = 0.6
+  ) +
+  
+  stat_dots(
+    side = "left", 
+    scale = 0.5,           # Constrain height to match slab
+    justification = 1.15,  # Push left, away from boxplot
+    binwidth = NA,         # Auto-binning
+    overflow = "compress", 
+    alpha = 0.3,           # Your requested alpha
+    size = 0.8,            # Adjust dot size if needed
+    aes(color = freq_bin)  # Color matching the fill
+  ) +
+  
+  geom_boxplot(
+    width = 0.15,          # Narrow width to fit in the middle
+    alpha = 0.5, 
+    outlier.shape = NA
+  ) +
+  
+  stat_summary(
+    fun = mean, 
+    geom = "point", 
+    shape = 18,            # Diamond shape
+    size = 4, 
+    color = "black"
+  ) +
+  
+  labs(
+    title = "Raincloud Plot: First Fixation Duration by Word Frequency",
+    x = "Word Frequency (binned)",
+    y = "First Fixation Duration (ms)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## RASTROS corpus: Gaze duration (gaze duration)
+
+```{r raincloud-rastros-gaze-duration}
+#| echo: true
+#| output-location: slide
+#| fig.width: 10
+#| fig.height: 6
+ggplot(rastros_clean, aes(x = freq_bin, y = IA_FIRST_RUN_DWELL_TIME, fill = freq_bin)) +
+  # The "Cloud"
+  stat_slab(
+    adjust = 0.5,
+    width = 0.6,
+    justification = -0.2, 
+    scale = .4,
+    alpha = 0.6
+  ) +
+
+  # The "rain" -- each dot is an observation
+  stat_dots(
+    side = "left", 
+    justification = 1.1, 
+    binwidth = NA,  # NA = auto-binning (beeswarm style). Set specific number for stricter bins.
+    overflow = "compress", 
+    alpha = 0.5,
+    size = 0.8,
+    scale=0.4,
+    aes(color = freq_bin)
+  ) +
+  
+  # Boxplot
+  geom_boxplot(
+    width = 0.1, 
+    alpha = 0.5, 
+    notch = FALSE,
+    outlier.shape = NA
+  ) +
+  # Axis lables, theme
+  labs(
+    title = "Raincloud Plot: Gaze Duration by Word Frequency",
+    x = "Word Frequency (binned)",
+    y = "Gaze Duration (ms)"
+  ) +
+  theme_minimal() +
+  # legend is not needed since colors are redundant with x position
+  theme(legend.position = "none")
+```
+
+## Removing outliers for gaze duration
+
+- Remove gaze durations above 1200 ms
+
+```{r rastros-remove-outliers-gaze-duration}
+#| echo: true
+rastros_clean <- rastros_clean %>%
+  mutate(IA_FIRST_RUN_DWELL_TIME = if_else(condition = IA_FIRST_RUN_DWELL_TIME < 1200,
+                                          true = IA_FIRST_RUN_DWELL_TIME, 
+                                          false = NA))
+```
+
+# Part 2: Fitting LMMs
+
+
+## Hindi data (factorial)
+- Setting up factors
+- Research Question: How do writing system (romance vs. traditional) and frequency (low vs. high) affect reading time?
+
+```{r setup-hindi-factors}
+# Create factors
+hindi_data_clean <- hindi_data_clean %>%
+  mutate(
+    writing_system = factor(writing_system, levels = c("Romance", "Traditional")),
+    frequency = factor(frequency, levels = c("Low", "High")),
+    subject = factor(RECORDING_SESSION_LABEL),
+    item = factor(stim_num)
+  )
+
+
+# Check the contrast coding
+contrasts(hindi_data_clean$writing_system)
+contrasts(hindi_data_clean$frequency)
+```
+
+## LMM with Factorial Design
+
+**Model specification:**
+
+-   Fixed effects: writing_system, frequency, and their interaction
+    - Contrasts: Treatment, with Low and Romance as baselines
+-   Random effect: Random intercepts for participant and item, 
+-   Dependent variable: IA_FIRST_FIXATION_DURATION
+
+```{r model-hindi-treatment}
+#| echo: true
+# Fit the model with interaction
+model_hindi_treatment <- lmer(IA_FIRST_FIXATION_DURATION ~ writing_system * frequency + 
+                     (1|subject) + (1|stim_num), 
+                   data = hindi_data_clean)
+```
+
+## Model summary {.scrollable}
+
+```{r model-hindi-treatment-summary}
+#| echo: true
+summary(model_hindi_treatment)
+```
+
+## Potential problems with this model
+
+- High correlation between main effects of writing system and frequency and interaction
+- This is not surprising in contrasts that are not centered (whose mean is not 0)
+- Alternative: Use sum contrasts. These are centered on 0
+
+## Sum contrast model {.scrollable}
+```{r model-hindi-sum-contrasts}
+#| echo: true
+#| output-location: slide
+
+# set sum contrasts
+contrasts(hindi_data_clean$writing_system) <- contr.sum(2)
+contrasts(hindi_data_clean$frequency) <- contr.sum(2)
+
+# show sum contrasts as applied
+contrasts(hindi_data_clean$writing_system)
+contrasts(hindi_data_clean$frequency)
+
+model_hindi_sum <- lmer(IA_FIRST_FIXATION_DURATION ~ writing_system * frequency + (1 | subject) + (1 | stim_num),
+                        data = hindi_data_clean,
+                        )
+```
+
+## Model summary {.scrollable}
+
+```{r model-hindi-sum-summary}
+#| echo: true
+summary(model_hindi_sum)
+```
+
+## Reporting Results - Hindi Data {.scrollable}
+
+```{r report-hindi}
+#| echo: true
+# Extract coefficients
+hindi_coef <- tidy(model_hindi_sum, effect = "fixed")
+print(hindi_coef)
+
+# Extract specific statistics for reporting
+writing_system_effect <- hindi_coef %>% filter(term == "writing_system1")
+frequency_effect <- hindi_coef %>% filter(term == "frequency1")
+interaction_effect <- hindi_coef %>% filter(term == "writing_system1:frequency1")
+
+# Format for inline reporting
+cat("Writing system effect: β =", round(writing_system_effect$estimate, 2), 
+    ", SE =", round(writing_system_effect$std.error, 2),
+    ", t =", round(writing_system_effect$statistic, 2),
+    ", p =", format.pval(writing_system_effect$p.value, digits = 3), "\n\n")
+
+cat("Frequency effect: β =", round(frequency_effect$estimate, 2), 
+    ", SE =", round(frequency_effect$std.error, 2),
+    ", t =", round(frequency_effect$statistic, 2),
+    ", p =", format.pval(frequency_effect$p.value, digits = 3), "\n\n")
+
+cat("Interaction: β =", round(interaction_effect$estimate, 2), 
+    ", SE =", round(interaction_effect$std.error, 2),
+    ", t =", round(interaction_effect$statistic, 2),
+    ", p =", format.pval(interaction_effect$p.value, digits = 3), "\n")
+```
+
+## Example Write-up - Hindi Data
+
+**Results:**
+
+> We fitted a linear mixed model to analyze first fixation durations with word type (Romance vs. Traditional) and frequency (Low vs. High) as fixed effects, including their interaction. Random intercepts for subjects and items were included in the model. Sum contrasts were used for both factors. The main effect of word type was `r if(writing_system_effect$p.value < 0.05) "significant" else "not significant"` (β = `r round(writing_system_effect$estimate, 2)`, SE = `r round(writing_system_effect$std.error, 2)`, t = `r round(writing_system_effect$statistic, 2)`, p = `r format.pval(writing_system_effect$p.value, digits = 3)`). The main effect of frequency was `r if(frequency_effect$p.value < 0.05) "significant" else "not significant"` (β = `r round(frequency_effect$estimate, 2)`, SE = `r round(frequency_effect$std.error, 2)`, t = `r round(frequency_effect$statistic, 2)`, p = `r format.pval(frequency_effect$p.value, digits = 3)`). The interaction between word type and frequency was `r if(interaction_effect$p.value < 0.05) "significant" else "not significant"` (β = `r round(interaction_effect$estimate, 2)`, SE = `r round(interaction_effect$std.error, 2)`, t = `r round(interaction_effect$statistic, 2)`, p = `r format.pval(interaction_effect$p.value, digits = 3)`).
+
+## Visualizing the Interaction
+
+```{r plot-hindi-interaction, fig.width=10, fig.height=6}
+# Calculate means by condition
+hindi_means <- hindi_data_clean %>%
+  group_by(writing_system, frequency) %>%
+  summarise(
+    mean_ffd = mean(IA_FIRST_FIXATION_DURATION, na.rm = TRUE),
+    se = sd(IA_FIRST_FIXATION_DURATION, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+ggplot(hindi_means, aes(x = writing_system, y = mean_ffd, color = frequency, group = frequency)) +
+  geom_point(size = 4) +
+  geom_line(linewidth = 1.2) +
+  geom_errorbar(aes(ymin = mean_ffd - se, ymax = mean_ffd + se), width = 0.1) +
+  labs(
+    title = "Interaction: Writing System × Frequency",
+    x = "Writing System",
+    y = "First Fixation Duration (ms)",
+    color = "Frequency"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+```
+
+# Part 3: RASTROS Data - Continuous Predictor
+
+## LMM with Continuous Predictor
+
+Research Question: Does word frequency predict first fixation duration in Portuguese reading?
+
+**Model specification:**
+
+-   Fixed effect: Freq_Brasileiro_log (log word frequency)
+-   Random effect: RECORDING_SESSION_LABEL (participant)
+-   Dependent variable: IA_FIRST_FIXATION_DURATION
+
+```{r model-rastros}
+# Fit the model
+model_rastros <- lmer(IA_FIRST_FIXATION_DURATION ~ Freq_Brasileiro_log + 
+                       (1|RECORDING_SESSION_LABEL), 
+                     data = rastros_clean)
+```
+
+## Model Summary - RASTROS Data
+
+```{r summary-rastros}
+summary(model_rastros)
+```
+
+## Reporting Results - RASTROS Data
+
+```{r report-rastros}
+# Extract coefficients
+rastros_coef <- tidy(model_rastros, effects = "fixed")
+print(rastros_coef)
+
+# Extract frequency effect for reporting
+freq_effect <- rastros_coef %>% filter(term == "Freq_Brasileiro_log")
+
+# Format for inline reporting
+cat("Word Frequency effect: β =", round(freq_effect$estimate, 2), 
+    ", SE =", round(freq_effect$std.error, 2),
+    ", t =", round(freq_effect$statistic, 2),
+    ", p =", format.pval(freq_effect$p.value, digits = 3), "\n")
+```
+
+For each 1-unit increase in log word frequency, first fixation duration changes by **`r round(freq_effect$estimate, 2)` ms** (p `r if(freq_effect$p.value < 0.001) "< .001" else paste("=", round(freq_effect$p.value, 3))`).
+
+## Example Write-up - RASTROS Data
+
+**Results:**
+
+> A linear mixed model was fitted with log word frequency (Freq_Brasileiro_log) as a continuous predictor of first fixation duration. Participant was included as a random intercept. The effect of word frequency was `r if(freq_effect$p.value < 0.05) "significant" else "not significant"` (β = `r round(freq_effect$estimate, 2)`, SE = `r round(freq_effect$std.error, 2)`, t = `r round(freq_effect$statistic, 2)`, p = `r format.pval(freq_effect$p.value, digits = 3)`), indicating that `r if(freq_effect$estimate < 0) "higher" else "lower"` frequency words were fixated `r if(freq_effect$estimate < 0) "for shorter durations" else "for longer durations"`.
+
+## Visualizing the Frequency Effect
+
+```{r plot-rastros, fig.width=10, fig.height=6}
+# Create predictions across frequency range
+freq_seq <- seq(min(rastros_clean$Freq_Brasileiro_log, na.rm = TRUE), 
+                max(rastros_clean$Freq_Brasileiro_log, na.rm = TRUE), 
+                by = 0.1)
+pred_data <- data.frame(Freq_Brasileiro_log = freq_seq)
+pred_data$predicted <- predict(model_rastros, newdata = pred_data, re.form = NA)
+
+ggplot(rastros_clean, aes(x = Freq_Brasileiro_log, y = IA_FIRST_FIXATION_DURATION)) +
+  geom_point(alpha = 0.1, size = 1) +
+  geom_line(data = pred_data, aes(x = Freq_Brasileiro_log, y = predicted), 
+            color = "blue", linewidth = 1.5) +
+  labs(
+    title = "First Fixation Duration by Word Frequency with LMM Prediction",
+    x = "Log Word Frequency (Freq_Brasileiro_log)",
+    y = "First Fixation Duration (ms)"
+  ) +
+  theme_minimal()
+```
+
+## Centering Continuous Predictors {.scrollable}
+
+- Centering helps with interpretability and reduces multicollinearity
+```{r center-frequency}
+#| echo: true
+#| output-location: slide
+# Center the frequency predictor
+
+rastros_clean <- rastros_clean %>%
+  mutate(Freq_Brasileiro_log_c = scale(Freq_Brasileiro_log, center = TRUE, scale = FALSE))
+# center the word length predictor
+rastros_clean <- rastros_clean %>%
+  mutate(Word_Length_c = scale(Word_Length, center = TRUE, scale = FALSE))
+# Fit model with centered predictor
+
+model_rastros_centered <- lmer(IA_FIRST_FIXATION_DURATION ~ Freq_Brasileiro_log_c * Word_Length_c +
+                                 (1|RECORDING_SESSION_LABEL), 
+                               data = rastros_clean)
+summary(model_rastros_centered)
+
+```
+
+# Part 4: Advanced Considerations
+
+## Transformations {.scrollable}
+- Consider log-transforming fixation times to address skewness.
+- Be aware that this changes the interpretation of coefficients (multiplicative effects on the original scale).
+```{r model-hindi-log-transform}
+#| echo: true
+#| output-location: slide
+
+# Log-transform fixation durations
+hindi_data_clean <- hindi_data_clean %>%
+  mutate(log_IA_FIRST_FIXATION_DURATION = log(IA_FIRST_FIXATION_DURATION))
+# Fit model with log-transformed DV
+model_hindi_log <- lmer(log_IA_FIRST_FIXATION_DURATION ~ writing_system * frequency + 
+                         (1 | subject) + (1 | stim_num),
+                       data = hindi_data_clean)
+summary(model_hindi_log)
+```
+## Visualizing the Interaction - Log Space
+
+```{r plot-hindi-interaction-log, fig.width=10, fig.height=6}
+# Calculate means by condition using emmeans
+hindi_means <- hindi_data_clean %>%
+  group_by(writing_system, frequency) %>%
+  summarise(
+    mean_ffd = mean(log_IA_FIRST_FIXATION_DURATION, na.rm = TRUE),
+    se = sd(log_IA_FIRST_FIXATION_DURATION, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+
+ggplot(hindi_means, aes(x = writing_system, y = mean_ffd, color = frequency, group = frequency)) +
+  geom_point(size = 4) +
+  geom_line(linewidth = 1.2) +
+  geom_errorbar(aes(ymin = mean_ffd - se, ymax = mean_ffd + se), width = 0.1) +
+  labs(
+    title = "Interaction: Writing System × Frequency",
+    x = "Writing System",
+    y = "Log first Fixation Duration (ms)",
+    color = "Frequency"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+```
+
+## Random Slopes
+
+**Key considerations:**
+
+::: incremental
+-   **Random intercepts only**: `(1|subject)` - allows baseline to vary by subject
+-   **Random slopes**: `(1 + predictor|subject)` - allows effect to vary by subject
+-   **When to include random slopes?** 
+    - Always [@barr2013; @oberauer2022]
+        - Not including random effects that are in the data may lead to anticonservative t- and p-values
+    - In practice: Complex random effects may fail to converge
+        - Many people use an incremental strategy
+:::
+
+## Random Slopes: Maximal random effects structure
+
+```{r random-slopes-example}
+#| echo: true
+#| error: true
+#| warning: true
+# Model with random slopes for frequency
+# This may not converge depending on data structure
+model_hindi_slopes <- lmer(IA_FIRST_FIXATION_DURATION ~ writing_system * frequency + 
+                            (writing_system * frequency|subject) + (writing_system * frequency|stim_num) , 
+                          data = hindi_data_clean)
+```
+
+## Reducing random slopes
+- Try eliminating interactions first, then item effects, then subject effects
+- This is **not** a perfectly safe strategy, as lack of convergence does not guarantee that there is no systematic effect
+- It is the best you can do without using Bayesian LMMs
+
+## Reduced random effects structure that still converges {.scrollable}
+
+```{r random-slopes-reduced}
+#| echo: true
+#| error: true
+#| warning: true
+model_hindi_slopes_reduced <- lmer(IA_FIRST_FIXATION_DURATION ~ writing_system * frequency + 
+                            (writing_system|subject) + (frequency|stim_num) , 
+                          data = hindi_data_clean)
+summary(model_hindi_slopes_reduced)
+```
+
+## Comparison with random intercept only model {.scrollable}
+
+- Model with slopes does not explain more variance than without
+
+```{r random-slopes-comparison}
+#| echo: true
+#| warning: true
+#| message: true
+
+anova(model_hindi_slopes_reduced, model_hindi_sum)
+```
+## Power Considerations {.smaller}
+
+@brysbaert2018: Rule of thumb for adequate power in response time studies
+
+::: incremental
+-   **1600 observations** per conditions is the minimum for detecting small to medium effects
+-   Our datasets:
+    - Hindi data: `r nrow(hindi_data_clean)/4` observations/condition
+      - We are short, but found effects anyway (the effects are quite large)
+    - RASTROS data: `r nrow(rastros_clean)` observations, but we don't have conditions
+       - This should be plenty for any meaningful effect
+-   Better: Simulations with `simr`.
+:::
+
+## Multiple Comparisons Problem
+
+**Issue**: Testing multiple hypotheses increases Type I error rate
+
+::: incremental
+-   **Our Hindi analysis**: 3 tests (writing system, frequency, interaction)
+    - But these do not necessarily correspond to the same hypothesis
+-   We have two measures (FFD and GD), which double the number of tests
+-   Adding different interest areas, we can easily reach dozens of tests
+-   **Family-wise error rate** increases with each test
+
+:::
+
+## Potential solutions
+::: incremental
+- Bonferroni correction: α/number of tests 
+  - Costly in terms of statistical power, but may be the best option [@vonDerMalsburg2017]
+- Limit the number of tests: Pre-register specific hypotheses
+- In any case, report all tests done (do not decide what to include based on significance)
+
+:::
+
+
+## Summary {.smaller}
+
+::: incremental
+-   LMMs handle repeated measures and crossed random effects typical for eye-tracking data
+-   They allow us to generalize over participants and stimuli
+-   **Hindi analysis**: Factorial design with sum contrasts
+-   **RASTROS analysis**: Continuous predictor (word frequency)
+-   **Transformations**: Apply judiciously to address skewness, but be aware of interpretation issues
+-   **Random slopes**: Consider carefully - balance theory and data
+-   **Power**: Aim for 1600+ observations [@brysbaert2018]
+-   **Multiple comparisons**: Adjust α, pre-register hypotheses
+:::
+
+## Best Practices {.smaller}
+
+::: incremental
+1.  Examine your data carefully, removing errors and outliers not reflective of the process you are studying
+2.  Use appropriate transformations, but adjust your interpretation of the results accordingly
+3.  Be aware of multicollinearity, especially when the model includes interactions
+    - Center predictors and use sum contrasts to reduce correlation
+4.  Be aware of potentially increased Type I error rates due to missing random slopes
+5.  Pre-register your study and limit the number of tests
+:::
+
+## Key References
+
+-   @barr2013: Keep it maximal - random effects structure
+-   @brysbaert2018: Power and precision in LMMs
+-   @bates2015: lme4 package
+-   @kuznetsova2017: lmerTest package
+-   @winter2013: Linear models and mixed-effects models tutorial
+
+## Questions?
+
+Thank you!
+
+For more information, visit: [github.com/bernhardangele/analysis-workshop-lacem](https://github.com/bernhardangele/analysis-workshop-lacem)
+
+## References
+
+::: {#refs}
+:::

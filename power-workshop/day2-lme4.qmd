@@ -1,0 +1,489 @@
+---
+title: "Day 2: lme4 for Eye Tracking Data"
+subtitle: "Power Workshop with R, lme4, and simR"
+author: "Bernhard Angele"
+format:
+  revealjs:
+    theme: default
+    slide-number: true
+    chalkboard: true
+    preview-links: auto
+    footer: "Day 2: lme4 for Eye Tracking Data"
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+---
+
+# Introduction to Mixed-Effects Models
+
+## Why Mixed-Effects Models?
+
+Eye-tracking and psycholinguistic data have **hierarchical structure**:
+
+- Multiple trials per participant
+- Multiple items/stimuli
+- Crossed random effects
+
+Mixed-effects models handle this structure appropriately.
+
+## The Problem with Repeated Measures
+
+Traditional approaches (repeated-measures ANOVA) assume:
+
+- **Sphericity** - equal variances of differences
+- Cannot handle missing data well
+- Cannot generalize to both subjects AND items
+
+## Crossed Random Effects
+
+In psycholinguistics and eye-tracking:
+
+- **Subjects** are a random sample from a population
+- **Items** are also a random sample from a population
+
+We want to generalize to both new subjects AND new items!
+
+# Part 1: lme4 Basics
+
+## Model Specification
+
+```{r}
+#| label: model-syntax
+# Example syntax (not run)
+# model <- lmer(DV ~ fixed_effects + (random_slopes | random_factor), data)
+
+# Examples:
+# Random intercepts only
+# lmer(fix_time ~ condition + (1 | subject) + (1 | item), data)
+
+# Random intercepts and slopes
+# lmer(fix_time ~ condition + (condition | subject) + (condition | item), data)
+```
+
+
+## Example: Data from Angele et al. (2013) {.smaller}
+
+- This was a gaze-contingent preview study with five conditions.
+- Example sentence:
+`Victor read the news| once this morning.`
+- Target word: `once`
+1. Correct preview (`once`)
+2. Repetition of preceding word (`news`)
+3. Orthographically related non-word (`niws`)
+4. Semantically related word (`tale`)
+5. Unrelated nonword (`tule`)
+
+## Packages
+
+```{r}
+#| label: setup
+#| echo: true
+library(lme4)
+library(lmerTest)
+library(tidyverse)
+library(gghalves)
+set.seed(123)
+```
+
+## Reading the data
+
+```{r}
+#| label: read-data
+#| echo: true
+
+exp2 <- read_csv("angele_et_al_2013_experiment_2.csv")
+
+```
+
+## Data Overview {.scrollable}
+
+```{r}
+#| label: data-overview
+#| echo: true
+#| fig-width: 8
+#| fig-height: 5
+#| warning: false
+#| output-location: slide
+
+# raincloud plot of n1 gzd by condition with gghalves::geom_half_violin
+
+library(ggplot2)
+library(gghalves)
+
+# Ensure 'preview' is a factor for the numeric offset to work
+exp2$preview <- as.factor(exp2$preview)
+
+# 1. Calculate the mean of the 'correct' condition first
+# Note: na.rm = TRUE ensures missing values don't break the calculation
+ref_mean <- mean(exp2$gzd_n1[exp2$preview == "correct"], na.rm = TRUE)
+
+# Ensure 'preview' is a factor
+exp2$preview <- as.factor(exp2$preview)
+
+ggplot(exp2, aes(x = preview, y = gzd_n1, fill = preview, color = preview)) + 
+  
+  # 2. The Cloud (Half Violin)
+  geom_half_violin(side = "r", position = position_nudge(x = 0.1), alpha = 0.5, trim = FALSE) +
+  
+  # 3. The Rain (Manual Jitter)
+  geom_point(aes(x = as.numeric(preview) - 0.15), 
+             position = position_jitter(width = 0.05), size = 1.5, alpha = 0.4) +
+  
+  # 4. The Boxplot
+  geom_boxplot(width = 0.1, outlier.shape = NA, alpha = 0.7, color = "black") +
+  
+  # 5. The Mean Marker (Diamond)
+  # fun = mean calculates the average for each x-axis group
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4, color = "red") +
+  
+  # 6. The Mean Label (Text)
+  # This adds the actual number above the diamond
+  stat_summary(fun = mean, geom = "text", aes(label = round(..y.., 0)), 
+               vjust = -2.5, color = "red", fontface = "bold") +
+  
+  # 7. The Reference Line (Added)
+  geom_hline(yintercept = ref_mean, linetype = "dashed", color = "gray", linewidth = 0.8) +
+  
+  # Styling
+
+  labs(title = "Gaze Duration on Word n+1 by Preview Condition",
+       y = "Gaze Duration (ms)",
+       x = "Preview Condition") +
+  theme_classic() +
+  guides(fill = "none", color = "none")
+
+```
+
+## lme4 Model with treatment contrasts
+- This is the original analysis as reported in Angele et al. (2013)
+```{r}
+#| label: lme4-model
+#| echo: true
+#| output-location: slide
+
+
+# Treatment contrasts (default)
+exp2$preview <- relevel(as.factor(exp2$preview), ref = "correct")
+model_treatment <- lmer(gzd_n1 ~ preview + 
+                          (1  | subject) + 
+                          (1 | item), 
+                        data = exp2)
+summary(model_treatment)
+```
+
+## Log-transforming the dependent variable {.scrollable}
+
+```{r}
+#| label: log-transform
+#| echo: true
+# Log-transform gzd_n1
+exp2$log_gzd_n1 <- log(exp2$gzd_n1)
+model_log <- lmer(log_gzd_n1 ~ preview + 
+                    (1 | subject) + 
+                    (1 | item), 
+                  data = exp2)
+summary(model_log)
+```
+## New contrasts {.scrollable}
+- Let's try a new contrast scheme
+- We can have four comparisons
+1. Repeated vs. not repeated (Orthographic and Repeated vs. Correct, Semantic, Unrelated)
+2. Orthographic vs. Repeated
+3. Correct vs. Semantic and Unrelated
+4. Semantic vs. Unrelated
+
+```{r}
+#| label: new-contrasts
+#| echo: true
+#| output-location: slide
+# Define custom contrasts
+# Build the hypothesis matrix
+hypothesis_matrix <- matrix(c(
+  2/3,  -1, -1, 2/3, 2/3,  # Repeated vs. others
+  0, -1,  1,  0,  0,  # Orthographic vs. Repeated
+ -1,  0,  0,  .5,  .5,  # Correct vs. Semantic and Unrelated
+  0,  0,  0,  -1, 1   # Semantic vs. Unrelated
+), ncol = 4)
+# Transpose and get generalized inverse for the contrast matrix
+contrast_matrix <- t(MASS::ginv(hypothesis_matrix))
+
+# Label contrasts
+colnames(contrast_matrix) <- c("Repeated_vs_Others", 
+                               "Orthographic_vs_Repeated", 
+                               "Correct_vs_SemanticUnrelated", 
+                               "Semantic_vs_Unrelated")
+
+# Apply contrasts to the preview factor
+contrasts(exp2$preview) <- contrast_matrix
+
+# Fit the model with custom contrasts
+model_custom <- lmer(log_gzd_n1 ~ preview + 
+                       (1 | subject) + 
+                       (1 | item), 
+                     data = exp2)
+
+summary(model_custom)
+```
+## How to specify a hypothesis matrix
+- Each row corresponds to a level of the factor
+- Each column corresponds to a contrast
+- Values indicate weights for each level in the contrast
+- The sum of weights in each contrast should be zero
+- Orthogonal contrasts are preferred, since we would like uncorrelated contrasts
+- How can we tell if contrasts are uncorrelated?
+- Calculate the dot product between each pair of contrast vectors (columns)
+
+## Example: Our hypothesis matrix for preview
+
+```{r}
+#| label: hypothesis-matrix
+#| echo: true
+# Display the hypothesis matrix including column sums
+
+hypothesis_matrix_with_sums <- rbind(
+  hypothesis_matrix,
+  colSums(hypothesis_matrix)
+)
+rownames(hypothesis_matrix_with_sums) <- c("correct", "repeated", "orthographic", "semantic", "unrelated", "Column_Sums")
+hypothesis_matrix_with_sums %>% zapsmall()
+```
+## Dot products of the hypothesis matrix columns
+
+```{r}
+#| label: dot-products
+#| echo: true
+# Calculate dot products between contrast vectors
+# replace diagonal with NA for clarity
+dot_products <- t(hypothesis_matrix) %*% hypothesis_matrix
+diag(dot_products) <- NA
+dot_products %>% zapsmall()
+```
+
+## Simulating Eye-Tracking Data
+
+```{r}
+#| label: simulate-data
+# Parameters
+n_subjects <- 30
+n_items <- 24
+effect_size <- 50  # ms difference
+
+# Create design
+data <- expand.grid(
+  subject = 1:n_subjects,
+  item = 1:n_items
+)
+data$condition <- ifelse(data$item <= n_items/2, "control", "experimental")
+
+# Random effects
+subject_intercepts <- rnorm(n_subjects, 0, 100)
+item_intercepts <- rnorm(n_items, 0, 50)
+subject_slopes <- rnorm(n_subjects, 0, 100)
+
+# Generate fix_time
+data$fix_time <- 250 +                                          # Grand mean
+  subject_intercepts[data$subject] +                      # Subject intercept
+  item_intercepts[data$item] +                            # Item intercept
+  ifelse(data$condition == "experimental", effect_size, 0) +
+  subject_slopes[data$subject] * (data$condition == "experimental") +
+  rnorm(nrow(data), 0, 100)                               # Residual error
+```
+
+## Visualizing the Data
+
+```{r}
+#| label: visualize-data
+#| fig-width: 8
+#| fig-height: 5
+#| output-location: slide
+# raincloud plot as above
+ggplot(data, aes(x = condition, y = fix_time)) + 
+  geom_half_violin(side = "r", position = position_nudge(x = 0.1), alpha = 0.5, trim = FALSE) +
+  geom_point(aes(x = as.numeric(condition) - 0.15), 
+             position = position_jitter(width = 0.05), size = 1.5, alpha = 0.4) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, alpha = 0.7, color = "black") +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4, color = "red") +
+  stat_summary(fun = mean, geom = "text", aes(label = round(..y.., 0)), 
+               vjust = -2.5, color = "red", fontface = "bold") +
+  labs(title = "Simulated fixation time by Condition",
+       y = "Fixation Time (ms)",
+       x = "Condition") +
+  theme_classic() +
+  guides(fill = "none", color = "none")
+```
+
+## Fitting the Model
+
+```{r}
+#| label: fit-model
+# Maximal random effects structure
+model <- lmer(fix_time ~ condition + (1 + condition | subject) + (1 | item), 
+              data = data)
+summary(model)
+```
+
+## Variance components
+
+```{r}
+#| label: variance-components
+# Extract variance components
+VarCorr(model)
+```
+
+
+## Subject variability
+
+```{r}
+#| label: subject-variability
+#| fig-width: 8
+#| fig-height: 5
+#| output-location: slide
+# Calculate subject means
+subject_means <- aggregate(fix_time ~ subject + condition, data, mean)
+
+ggplot(subject_means, aes(x = condition, y = fix_time, group = subject)) +
+  geom_line(alpha = 0.5) +
+  geom_point() +
+  labs(title = "Individual Subject Patterns",
+       y = "Mean fixation duration (ms)")
+```
+
+## Item variability
+
+```{r}
+#| label: item-variability
+#| fig-width: 8
+#| fig-height: 5
+#| output-location: slide
+# Calculate item means
+item_means <- aggregate(fix_time ~ item + condition, data, mean)
+
+ggplot(item_means, aes(x = item, y = fix_time, fill = condition)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Item-level Patterns",
+       y = "Mean fix_time (ms)")
+```
+
+
+## Basic power simulation framework
+
+To estimate power for mixed-effects models:
+
+1. Define true population parameters
+2. Simulate many datasets
+3. Fit models to each dataset
+4. Calculate proportion of significant effects
+
+## Basic power simulation
+
+```{r}
+#| label: power-simulation-function
+
+
+simulate_power_lmer <- function(n_subjects, n_items, effect_size,
+                                 sd_subject = 100, sd_item = 50,
+                                 sd_slope = 30, sd_residual = 100,
+                                 n_sims = 100) {
+  
+  significant <- replicate(n_sims, {
+    # Create design
+    data <- expand.grid(
+      subject = 1:n_subjects,
+      item = 1:n_items
+    )
+    data$condition <- ifelse(data$item <= n_items/2, 0, 1)
+    
+    # Random effects
+    subj_int <- rnorm(n_subjects, 0, sd_subject)
+    item_int <- rnorm(n_items, 0, sd_item)
+    subj_slope <- rnorm(n_subjects, 0, sd_slope)
+    
+    # Generate fix_time
+    data$fix_time <- 500 + 
+      subj_int[data$subject] +
+      item_int[data$item] +
+      effect_size * data$condition +
+      subj_slope[data$subject] * data$condition +
+      rnorm(nrow(data), 0, sd_residual)
+    
+    # Fit model and extract p-value
+    tryCatch({
+      model <- lmer(fix_time ~ condition + (1 + condition | subject) + (1 | item), 
+                    data = data)
+      coef_table <- summary(model)$coefficients
+      if ("Pr(>|t|)" %in% colnames(coef_table)) {
+        p_val <- coef_table["condition", "Pr(>|t|)"]
+      } else {
+        # Use t-value approximation
+        t_val <- coef_table["condition", "t value"]
+        df_approx <- n_subjects - 1
+        p_val <- 2 * pt(abs(t_val), df_approx, lower.tail = FALSE)
+      }
+      p_val < 0.05
+    }, error = function(e) NA)
+  })
+  
+  mean(significant, na.rm = TRUE)
+}
+```
+
+## Running Power Simulations
+
+```{r}
+#| label: run-simulation
+#| cache: true
+set.seed(42)
+
+# Test with current parameters
+power_est <- simulate_power_lmer(
+  n_subjects = 30,
+  n_items = 24,
+  effect_size = 50,
+  sd_subject = 100,
+  sd_item = 50,
+  sd_slope = 50,
+  sd_residual = 100,
+  n_sims = 100
+)
+
+cat("Estimated power:", power_est)
+```
+
+# Part 4: Random Effects Structure
+
+## Maximal vs Minimal Models
+
+**Barr et al. (2013)** recommend maximal random effects structure:
+
+- Include all random slopes justified by design
+- Reduces Type I errors
+
+But this comes with costs:
+
+- Convergence issues
+- Requires more data
+
+## Model Comparison
+
+```{r}
+#| label: model-comparison
+# Minimal model (random intercepts only)
+model_minimal <- lmer(fix_time ~ condition + (1 | subject) + (1 | item), data = data)
+
+# Maximal model (with random slopes)
+model_maximal <- lmer(fix_time ~ condition + (1 + condition | subject) + (1 | item), 
+                      data = data)
+
+# Compare
+anova(model_minimal, model_maximal)
+```
+
+## Summary
+- Mixed-effects models are essential for analyzing hierarchical data.
+- lme4 provides flexible tools for fitting these models.
+- Custom contrasts allow testing specific hypotheses.
+- Careful consideration of random effects structure is crucial for valid inferences.
+
+
