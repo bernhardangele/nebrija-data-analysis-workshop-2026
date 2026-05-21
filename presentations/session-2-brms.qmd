@@ -1,0 +1,104 @@
+---
+title: "Session 2: Bayesian Mixed-Effects Models with brms"
+subtitle: "Data Analysis Workshop 2026"
+author: "Nebrija Workshop"
+format:
+  revealjs:
+    incremental: true
+---
+
+## Audience and Goals
+
+- PhD students in cognitive and experimental psychology
+- Psycholinguistics and education research contexts
+- Goal: practical Bayesian mixed modeling for complex designs
+
+## 1) Bayesian Paradigm Shift
+
+### Escaping Singular Fit Failures
+
+- Bayesian models estimate uncertainty even near zero random-slope variance
+- Regularizing priors prevent pathological boundary behavior
+
+### Philosophy of Priors
+
+- Move beyond flat defaults for complex multilevel designs
+- Use weakly informative priors on fixed effects and group-level SDs
+
+```{r}
+#| eval: false
+priors <- c(
+  prior(normal(0, 0.5), class = "b"),
+  prior(exponential(1), class = "sd")
+)
+```
+
+## 2) Practical Lab: Custom Response Distributions
+
+### The Reaction-Time Dilemma
+
+- Avoid arbitrary outlier removal as the primary strategy
+- Avoid reflexive log-transform-only workflows
+
+### Alternative Likelihoods
+
+```{r}
+#| eval: false
+fit_shifted <- brm(
+  rt ~ condition + (condition | p | subject) + (condition | i | item),
+  data = df,
+  family = shifted_lognormal(),
+  prior = priors
+)
+
+fit_exgaussian <- brm(
+  rt ~ condition + (condition | p | subject) + (condition | i | item),
+  data = df,
+  family = exgaussian(),
+  prior = priors
+)
+```
+
+### Ordinal Judgments
+
+```{r}
+#| eval: false
+fit_ordinal <- brm(
+  rating ~ condition + (condition | subject) + (condition | item),
+  data = df,
+  family = cumulative(link = "logit")
+)
+```
+
+## 3) MCMC Assessment and Convergence
+
+- Target 2026 standard: $\\hat{R} < 1.01$
+- Check ESS and divergent transitions
+- Use trace/density diagnostics and posterior predictive checks
+
+```{r}
+#| eval: false
+summary(fit_shifted)
+pp_check(fit_shifted)
+```
+
+## 4) Writing Up Bayesian Mixed Models
+
+- Report posterior means/medians and credible intervals
+- Add directional probabilities, e.g., $P(b > 0)$
+- Optionally include Bayes Factors where justified
+
+```{r}
+#| eval: false
+library(tidybayes)
+library(ggplot2)
+
+posterior <- spread_draws(fit_shifted, b_condition)
+ggplot(posterior, aes(x = b_condition)) +
+  geom_density(fill = "steelblue", alpha = 0.4)
+```
+
+## Pre-Workshop Assignment and Clinic
+
+- Bring a personal dataset or replication target paper
+- Final 30-minute clinic: map dissertation designs to `lme4` or `brms` formulas

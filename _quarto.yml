@@ -1,0 +1,15 @@
+project:
+  type: default
+
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    toc: true
+
+execute:
+  echo: true
+
+render:
+  - presentations/session-1-lme4.qmd
+  - presentations/session-2-brms.qmd
