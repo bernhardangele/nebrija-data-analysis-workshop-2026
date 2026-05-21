@@ -155,9 +155,9 @@ emmeans(model_try, ~ condition)
 
 ## Key references
 
-- Barr et al. (2013)
-- Matuschek et al. (2017)
-- Bates et al. (2015) `lme4`
+- Barr, D. J., Levy, R., Scheepers, C., & Tily, H. J. (2013). Random effects structure for confirmatory hypothesis testing: Keep it maximal. *Journal of Memory and Language, 68*(3), 255-278.
+- Matuschek, H., Kliegl, R., Vasishth, S., Baayen, H., & Bates, D. (2017). Balancing Type I error and power in linear mixed models. *Journal of Memory and Language, 94*, 305-315.
+- Bates, D., Mächler, M., Bolker, B., & Walker, S. (2015). Fitting linear mixed-effects models using lme4. *Journal of Statistical Software, 67*(1), 1-48.
 
 ## Questions and discussion
 

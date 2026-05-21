@@ -3,7 +3,7 @@
   "image": "bangele1/analysis-in-a-box-rocker:latest",
   "forwardPorts": [8787],
   "containerEnv": {
-    "PASSWORD": "mypassword",
+    "PASSWORD": "${localEnv:RSTUDIO_PASSWORD}",
     "CMDSTAN": "/opt/cmdstan/cmdstan-2.37.0"
   },
   "customizations": {

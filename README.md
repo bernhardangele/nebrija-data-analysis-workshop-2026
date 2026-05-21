@@ -90,6 +90,7 @@ You can run the same environment locally with Docker by using the repository dev
 - Base image: `bangele1/analysis-in-a-box-rocker:latest`
 - Exposed RStudio Server port: `8787`
 - Includes `CMDSTAN` path and VS Code R/Quarto extensions
+- Set a local environment variable before startup, e.g. `export RSTUDIO_PASSWORD=\"your-secure-password\"`
 
 In VS Code, install the Dev Containers extension, then use:
 

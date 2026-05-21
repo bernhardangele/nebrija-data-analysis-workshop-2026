@@ -53,7 +53,7 @@ priors <- c(
 ```{r}
 #| eval: false
 fit_gaussian <- brm(
-  rt ~ condition + (condition | p | subject) + (condition | i | item),
+  rt ~ condition + (condition | participant | subject) + (condition | stimulus_item | item),
   data = df,
   family = gaussian(),
   prior = priors,
@@ -71,14 +71,14 @@ fit_gaussian <- brm(
 ```{r}
 #| eval: false
 fit_shifted <- brm(
-  rt ~ condition + (condition | p | subject) + (condition | i | item),
+  rt ~ condition + (condition | participant | subject) + (condition | stimulus_item | item),
   data = df,
   family = shifted_lognormal(),
   prior = priors
 )
 
 fit_exgaussian <- brm(
-  rt ~ condition + (condition | p | subject) + (condition | i | item),
+  rt ~ condition + (condition | participant | subject) + (condition | stimulus_item | item),
   data = df,
   family = exgaussian(),
   prior = priors
