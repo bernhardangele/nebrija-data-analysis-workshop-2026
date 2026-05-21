@@ -9,162 +9,255 @@ format:
 
 ## Session roadmap (3h)
 
-- **Part 1 (40 min):** Bayesian multilevel fundamentals and prior specification
-- **Part 2 (60 min):** fitting `brms` models for Gaussian and non-Gaussian outcomes
-- **Part 3 (50 min):** convergence diagnostics, posterior checks, and model comparison
-- **Part 4 (30 min):** scientific reporting and final assignment guidance
+- **Part 1 (35 min):** frequentist-to-Bayesian translation on the same dataset
+- **Part 2 (55 min):** prior specification and family selection
+- **Part 3 (60 min):** fitting, diagnostics, and model comparison
+- **Part 4 (30 min):** posterior interpretation and reporting
 
-## Session goals
+## Continuity from Session 1
 
-- Translate frequentist mixed models into Bayesian formulations
-- Specify regularizing priors and understand their practical role
-- Fit and interpret `brms` models for RT and ordinal outcomes
-- Produce defensible Bayesian write-ups for peer-reviewed publications
+Same dataset and question as Session 1:
 
-## Why move from frequentist to Bayesian mixed models?
+- Data: `analysis-workshop/data/Hindi_new.csv`
+- Outcome: first-run dwell time
+- Predictors: `writing_system`, `frequency`, and their interaction
+- Random effects: participants and items
 
-- Frequentist maximal models often encounter convergence/singularity limits
-- Bayesian estimation can remain stable with weakly informative regularization
-- Posterior inference supports direct probability statements about effects
+## Why Bayesian for this case?
 
-## Frequentist-to-Bayesian mapping
+- Right-skewed RT data makes Gaussian assumptions fragile
+- Complex random-effects structures may be weakly identified
+- We want direct probability statements (e.g., probability effect < 0)
+- Priors let us regularize implausible parameter values
 
-- Formula structure remains familiar (`lme4`-style syntax)
-- Add priors explicitly for fixed effects and variance parameters
-- Evaluate posterior quality (not only point-estimate significance)
+## Bayesian workflow for this dataset
 
-## Priors: practical defaults for workshop analyses
+1. Reuse cleaned dataset from Session 1
+2. Define priors from domain scale
+3. Fit competing likelihood families
+4. Diagnose chains and geometry
+5. Compare predictive performance
+6. Summarize posterior inferences for hypotheses
+
+## Step 1: load packages and data
 
 ```{r}
 #| eval: false
+library(tidyverse)
 library(brms)
+library(tidybayes)
+library(bayesplot)
+library(loo)
 
-priors <- c(
-  prior(normal(0, 0.5), class = "b"),
+hindi <- read_csv("analysis-workshop/data/Hindi_new.csv") %>%
+  mutate(
+    subject = factor(RECORDING_SESSION_LABEL),
+    item = factor(stim_num),
+    writing_system = if_else(cond_name %in% c("RL", "RH"), "Romance", "Traditional"),
+    frequency = if_else(cond_name %in% c("RH", "TH"), "High", "Low"),
+    writing_system = factor(writing_system),
+    frequency = factor(frequency)
+  ) %>%
+  filter(practice == "No", IA_SKIP == 0) %>%
+  mutate(
+    frd = if_else(
+      IA_FIRST_RUN_DWELL_TIME >= 80 & IA_FIRST_RUN_DWELL_TIME <= 2000,
+      IA_FIRST_RUN_DWELL_TIME,
+      NA_real_
+    )
+  )
+```
+
+## Decision checkpoint A: response family candidates
+
+- Candidate 1: `gaussian()` on `log(frd)`
+- Candidate 2: `shifted_lognormal()` on raw `frd`
+- Candidate 3: `exgaussian()` on raw `frd`
+
+**Decision strategy:** keep all three initially, then compare posterior predictive fit and LOO.
+
+## Step 2: scale and coding decisions
+
+```{r}
+#| eval: false
+hindi <- hindi %>%
+  mutate(log_frd = log(frd))
+
+contrasts(hindi$writing_system) <- contr.sum(2)
+contrasts(hindi$frequency) <- contr.sum(2)
+```
+
+- Sum coding keeps parameter interpretation aligned with Session 1
+
+## Step 3: priors based on plausible RT scale
+
+```{r}
+#| eval: false
+priors_gaussian <- c(
+  prior(normal(6, 0.6), class = "Intercept"),  # log-ms scale
+  prior(normal(0, 0.2), class = "b"),
+  prior(exponential(1), class = "sd"),
+  prior(lkj(2), class = "cor"),
+  prior(exponential(1), class = "sigma")
+)
+
+priors_rt <- c(
+  prior(normal(500, 250), class = "Intercept"),
+  prior(normal(0, 80), class = "b"),
   prior(exponential(1), class = "sd"),
   prior(lkj(2), class = "cor")
 )
 ```
 
-- Priors regularize estimation and reduce extreme, weakly identified solutions
+## Prior predictive check before fitting
 
-## Basic Bayesian mixed model
+```{r}
+#| eval: false
+fit_prior <- brm(
+  log_frd ~ writing_system * frequency + (1 + frequency | subject) + (1 + frequency | item),
+  data = hindi,
+  family = gaussian(),
+  prior = priors_gaussian,
+  sample_prior = "only",
+  chains = 4, iter = 2000, warmup = 1000
+)
+
+pp_check(fit_prior)
+```
+
+- **Decision:** if prior predictive mass is unrealistic, tighten priors before posterior fitting
+
+## Step 4: fit Gaussian model on log RT
 
 ```{r}
 #| eval: false
 fit_gaussian <- brm(
-  rt ~ condition + (condition | subject) + (condition | item),
-  data = df,
+  log_frd ~ writing_system * frequency + (1 + frequency | subject) + (1 + frequency | item),
+  data = hindi,
   family = gaussian(),
-  prior = priors,
-  chains = 4,
+  prior = priors_gaussian,
+  chains = 4, iter = 4000, warmup = 2000,
   cores = 4,
-  iter = 4000
+  control = list(adapt_delta = 0.95)
 )
 ```
 
-## Modeling reaction times without over-simplification
-
-- Avoid relying only on aggressive trimming or log transforms
-- Use response distributions adapted to RT skewness
+## Step 5: fit shifted lognormal on raw RT
 
 ```{r}
 #| eval: false
 fit_shifted <- brm(
-  rt ~ condition + (condition | subject) + (condition | item),
-  data = df,
+  frd ~ writing_system * frequency + (1 + frequency | subject) + (1 + frequency | item),
+  data = hindi,
   family = shifted_lognormal(),
-  prior = priors
-)
-
-fit_exgaussian <- brm(
-  rt ~ condition + (condition | subject) + (condition | item),
-  data = df,
-  family = exgaussian(),
-  prior = priors
+  prior = priors_rt,
+  chains = 4, iter = 4000, warmup = 2000,
+  cores = 4,
+  control = list(adapt_delta = 0.98, max_treedepth = 12)
 )
 ```
 
-## Ordinal outcomes in cognitive/educational research
+## Optional: ex-Gaussian sensitivity model
 
 ```{r}
 #| eval: false
-fit_ordinal <- brm(
-  rating ~ condition + (condition | subject) + (condition | item),
-  data = df,
-  family = cumulative(link = "logit"),
-  prior = priors
+fit_exgaussian <- brm(
+  frd ~ writing_system * frequency + (1 + frequency | subject) + (1 + frequency | item),
+  data = hindi,
+  family = exgaussian(),
+  prior = priors_rt,
+  chains = 4, iter = 4000, warmup = 2000,
+  cores = 4,
+  control = list(adapt_delta = 0.98)
 )
 ```
 
-- Useful for Likert judgments and acceptability ratings
-
-## MCMC quality checks (minimum standards)
-
-- $\hat{R} < 1.01$
-- Adequate effective sample sizes (bulk and tail ESS)
-- No problematic divergence patterns
+## Diagnostics checkpoint B: sampler quality
 
 ```{r}
 #| eval: false
 summary(fit_shifted)
 plot(fit_shifted)
-pp_check(fit_shifted)
+mcmc_rhat(rhat(fit_shifted))
+mcmc_neff(neff_ratio(fit_shifted))
 ```
 
-## Model adequacy and comparison
+Minimum targets:
 
-- Posterior predictive checks for distributional fit
-- Compare plausible families (e.g., shifted lognormal vs ex-Gaussian)
-- Use LOO/WAIC or theoretically constrained comparisons where appropriate
+- $\hat{R} < 1.01$
+- high effective sample size
+- zero divergences after warmup
+
+## Diagnostics checkpoint C: predictive adequacy
 
 ```{r}
 #| eval: false
-loo(fit_shifted, fit_exgaussian)
+pp_check(fit_gaussian, ndraws = 100)
+pp_check(fit_shifted, ndraws = 100)
+pp_check(fit_exgaussian, ndraws = 100)
 ```
 
-## Interpreting posterior effects
+- **Decision:** prefer the family that captures skew and tails with fewer systematic mismatches
 
-- Report posterior estimates and credible intervals
-- Add directional probabilities, e.g., $P(\beta > 0)$
-- Use visual posterior summaries to support narrative claims
+## Model comparison for final family choice
 
 ```{r}
 #| eval: false
-library(tidybayes)
-library(ggplot2)
-
-posterior <- spread_draws(fit_shifted, b_condition)
-mean(posterior$b_condition > 0)
-
-ggplot(posterior, aes(x = b_condition)) +
-  geom_density(fill = "steelblue", alpha = 0.4) +
-  labs(x = "Posterior draw: b_condition", y = "Density")
+loo_compare(
+  loo(fit_gaussian),
+  loo(fit_shifted),
+  loo(fit_exgaussian)
+)
 ```
 
-## Bayes factors (when justified)
+- **Decision rule:** if one model has clearly better expected out-of-sample fit and good diagnostics, adopt it as primary
 
-- Bayes factors are prior-sensitive and require explicit prior reporting
-- If used, fit with `sample_prior = "yes"` and report sensitivity checks
+## Posterior inference for hypotheses
 
 ```{r}
 #| eval: false
-hypothesis(fit_shifted, "b_condition = 0")
+post <- spread_draws(fit_shifted, b_writing_system1, b_frequency1, `b_writing_system1:frequency1`)
+
+mean(post$b_frequency1 < 0)               # P(frequency effect is faster)
+mean(post$`b_writing_system1:frequency1` != 0)
 ```
 
-## Writing Bayesian methods and results
+- Report directional probabilities and 95% credible intervals
 
-- Describe prior rationale, model family, sampling settings, and diagnostics
-- Report posterior summaries and uncertainty clearly
-- Connect model choice to research question and data-generating process
+## Marginal effects for interpretation
+
+```{r}
+#| eval: false
+conditional_effects(fit_shifted, effects = "writing_system:frequency")
+```
+
+- Use model-based estimated means instead of raw means for final interpretation
+
+## Example decision log (Bayesian)
+
+1. Reused Session 1 cleaning criteria for comparability
+2. Tested Gaussian(log RT), shifted lognormal, and ex-Gaussian likelihoods
+3. Ran prior predictive checks and adjusted priors to plausible RT range
+4. Increased `adapt_delta` when necessary to eliminate divergences
+5. Selected final model by combining diagnostics + LOO + theoretical plausibility
+
+## Reporting template (Bayesian)
+
+- **Model:** formula, family, priors, software/version
+- **Sampling:** chains, iterations, warmup, control settings
+- **Diagnostics:** $\hat{R}$, ESS, divergences, posterior predictive checks
+- **Comparison:** LOO/WAIC and rationale for final model
+- **Results:** posterior means/medians, credible intervals, directional probabilities
 
 ## Final autonomous assignment (2h independent work)
 
-- Choose `lme4` or `brms` with your own data (or provided public dataset)
-- Produce a maximum 1-page results-style report
-- Justify model architecture and interpret key effects
+- Choose one dependent variable from your own project
+- Write a short decision log (cleaning + model + diagnostics)
+- Fit one frequentist and one Bayesian model for the same question
+- Submit a 1-page results-style report with justified model choice
 
 ## Closing clinic
 
-- Translate each dissertation project into a concrete analysis plan
-- Identify minimum reproducible reporting elements for submission-ready analyses
+- Translate your dissertation question into an explicit multilevel model
+- Identify one likely diagnostic failure point in advance
+- Define decision criteria before fitting final confirmatory model
