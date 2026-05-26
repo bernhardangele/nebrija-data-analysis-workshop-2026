@@ -8,27 +8,49 @@ format:
     theme: [simple, custom.scss]
     logo: images/logo.png
     slide-number: true
-    toc: true
+    toc: false
 bibliography: references.bib
 csl: apa.csl
 ---
 
-## Session Roadmap (3h)
+## Workshop plan
 
-- **Part 1 (45 min):** The Bayesian multilevel framework, priors, and response families
-- **Part 2 (45 min):** Modeling response times with the ex-Gaussian distribution in `brms`
-- **Part 3 (45 min):** Modeling accuracy (Bernoulli) & complex random effect structures
-- **Part 4 (45 min):** Modeling eye movements (Shifted Lognormal), diagnostics, and LOO model comparison
+Welcome to our workshop on analyzing data from experiments in cognitive psychology, and linguistics, and education using frequentist and Bayesian linear mixed models. 
+
+Here is the plan for this workshop:
+
+- **Session 1 (yesterday)**
+  - **Part 1** Introducing the workshop data sets
+  - **Part 2:** Data preprocessing, exclusions, and custom contrast coding
+  - **Part 3:** Linear mixed-effects modeling of response times (Gaussian) using `lme4`
+
+- **Session 2 (today)**
+  - **Part 1** The Bayesian multilevel framework, priors, and response families
+  - **Part 2:** Modeling response times with the Gaussian distribution in `brms`
+  - **Part 3:** Using the ex-Gaussian distribution in `brms`
+  - **Part 4:** Model diagnostics, posterior predictive checks, interpretation
 
 ## Section 1: The Bayesian Multilevel Framework {.dark-bg background-color="#1F497D"}
 
 ## Why Bayesian Multilevel Models?
 
-Frequentist models (`lme4`) are highly efficient but suffer from critical limitations:
+Yesterday, we have seen that frequentist models (`lme4`) suffer from critical limitations:
 
-1. **Singular Fit Failures:** Complex maximal random-effect structures often fail to converge or result in zero-variance estimates.
-2. **Strict Likelihood Assumptions:** RTs and eye-tracking durations are highly skewed, forcing arbitrary log-transformations.
-3. **No Direct Probability:** Confidence intervals and $p$-values are frequently misinterpreted; they do not state the probability of an effect being true.
+1. **Convergence Issues:** Complex maximal random-effect structures often fail to converge or result in zero-variance estimates.
+2. **Only work with a handful of distributions:** RTs (and other measures such as eye-tracking fixation durations) are highly skewed. This can be addressed with transformations, but it is not ideal. The Gaussian family cannot model the true shape of the data.
+3. **Conceptual issues of frequentist inference:** Confidence intervals and $p$-values are frequently misinterpreted; they do not state the probability of an effect being true.
+
+## Basic introduction to Bayesian Inference
+
+- In frequentist statistics, we set up a "straw man" hypothesis (the null) and compute the probability of observing our data (or more extreme) if the null were true. This is the $p$-value, a probability of the data given a hypothesis (the hypothesis that the parameter specifying the size of our effect is zero). The $p$-value is often misinterpreted as the probability that our hypothesis is true, which it is not.
+- Bayesian inference allows us directly estimate the probability of our hypotheses (or, more generally, the parameters of our model) given the data. This is done by combining our prior beliefs (priors) with the likelihood of the observed data to obtain a posterior distribution over our parameters of interest.
+- Bayes' theorem formalizes this process:
+$$P(\theta | D) = \frac{P(D | \theta) P(\theta)}{P(D)}$$
+Where:
+- $P(\theta | D)$ is the posterior distribution of the parameters $\theta$ given the data $D$.
+- $P(D | \theta)$ is the likelihood of the data given the parameters.
+- $P(\theta)$ is the prior distribution of the parameters.
+- $P(D)$ is the marginal likelihood of the data, which serves as a normalizing constant.
 
 ## The Bayesian Solution
 

@@ -15,14 +15,16 @@ csl: apa.csl
 
 ## Workshop plan
 
-Welcome to our workshop on analyzing data from experiments in cognitive psychology, and linguistics, and education using frequentist and Bayesian linear mixed models. 
-
-Here is the plan for this workshop:
-
-- **Today**
+- **Session 1 (today)**
   - **Part 1** Introducing the workshop data sets
   - **Part 2:** Data preprocessing, exclusions, and custom contrast coding
   - **Part 3:** Linear mixed-effects modeling of response times (Gaussian) using `lme4`
+
+- **Session 2 (tomorrow)**
+  - **Part 1** The Bayesian multilevel framework, priors, and response families
+  - **Part 2:** Modeling response times with the Gaussian distribution in `brms`
+  - **Part 3:** Using the ex-Gaussian distribution in `brms`
+  - **Part 4:** Model diagnostics, posterior predictive checks, interpretation
 
 ## Part 1: Introduction to the Workshop Datasets {.dark-bg background-color="#C2002F"}
 
