@@ -1,263 +1,242 @@
 ---
 title: "Session 2: Bayesian Mixed-Effects Models with brms"
-subtitle: "Data Analysis Workshop 2026"
+subtitle: "Ex-Gaussian RTs, Bernoulli Accuracy, and Shifted Lognormal Eye Movements"
 author: "Dr. Bernhard Angele"
 format:
   revealjs:
     incremental: true
+    theme: [simple, custom.scss]
+    logo: images/logo.png
+    slide-number: true
+    toc: true
+bibliography: references.bib
+csl: apa.csl
 ---
 
-## Session roadmap (3h)
+## Session Roadmap (3h)
 
-- **Part 1 (35 min):** frequentist-to-Bayesian translation on the same dataset
-- **Part 2 (55 min):** prior specification and family selection
-- **Part 3 (60 min):** fitting, diagnostics, and model comparison
-- **Part 4 (30 min):** posterior interpretation and reporting
+- **Part 1 (45 min):** The Bayesian multilevel framework, priors, and response families
+- **Part 2 (45 min):** Modeling response times with the ex-Gaussian distribution in `brms`
+- **Part 3 (45 min):** Modeling accuracy (Bernoulli) & complex random effect structures
+- **Part 4 (45 min):** Modeling eye movements (Shifted Lognormal), diagnostics, and LOO model comparison
 
-## Continuity from Session 1
+## Section 1: The Bayesian Multilevel Framework {.dark-bg background-color="#1F497D"}
 
-Same dataset and question as Session 1:
+## Why Bayesian Multilevel Models?
 
-- Data: `analysis-workshop/data/Hindi_new.csv`
-- Outcome: first-run dwell time
-- Predictors: `writing_system`, `frequency`, and their interaction
-- Random effects: participants and items
+Frequentist models (`lme4`) are highly efficient but suffer from critical limitations:
 
-## Why Bayesian for this case?
+1. **Singular Fit Failures:** Complex maximal random-effect structures often fail to converge or result in zero-variance estimates.
+2. **Strict Likelihood Assumptions:** RTs and eye-tracking durations are highly skewed, forcing arbitrary log-transformations.
+3. **No Direct Probability:** Confidence intervals and $p$-values are frequently misinterpreted; they do not state the probability of an effect being true.
 
-- Right-skewed RT data makes Gaussian assumptions fragile
-- Complex random-effects structures may be weakly identified
-- We want direct probability statements (e.g., probability effect < 0)
-- Priors let us regularize implausible parameter values
+## The Bayesian Solution
 
-## Bayesian workflow for this dataset
+::: {.accent-box}
+### Three Bayesian Columns
+* **Priors:** Regularize parameters and prevent singular fits through shrinkage.
+* **Flexible Families:** Model skewed distributions (ex-Gaussian, Shifted Lognormal) directly on the raw scale.
+* **Posterior Distributions:** Obtain direct probability statements regarding our hypotheses.
+:::
 
-1. Reuse cleaned dataset from Session 1
-2. Define priors from domain scale
-3. Fit competing likelihood families
-4. Diagnose chains and geometry
-5. Compare predictive performance
-6. Summarize posterior inferences for hypotheses
+## Prior Specification
 
-## Step 1: load packages and data
+Bayesian inference combines our **Priors** (prior beliefs about parameter scales) and **Likelihood** (observed data) to calculate the **Posterior** distribution:
+
+* **Weakly Informative/Regularizing Priors:** Restrict parameters to physically/physiologically plausible bounds (e.g., response times cannot be negative or 10 seconds).
+* **Shrinkage:** Pulls extreme, noisy random effect estimates towards the group mean, preventing overfitting.
+
+## Section 2: Modeling RTs with the ex-Gaussian Distribution {.dark-bg background-color="#1F497D"}
+
+## What is the ex-Gaussian Distribution?
+
+Human reaction times are rarely symmetrical. They are heavily right-skewed. The **ex-Gaussian** distribution represents this shape by combining:
+
+1. A **Gaussian (normal) distribution** representing the cognitive core ($\mu$ and $\sigma$).
+2. An **exponential distribution** representing the right-tail skew ($\beta$).
+
+$$\text{RT} \sim \text{Normal}(\mu, \sigma) + \text{Exponential}(\beta)$$
+
+Rather than log-transforming response times, we can model raw `rt` directly and test how our conditions affect both the **core latency** ($\mu$) and the **decision tail** ($\beta$).
+
+## Bayesian RT: Priors & ex-Gaussian setup
+
+We will define regularizing priors for both the Gaussian core ($\mu$) and the exponential tail ($\beta$) of our reaction times before fitting the model in `brms`:
 
 ```{r}
 #| eval: false
-library(tidyverse)
 library(brms)
-library(tidybayes)
-library(bayesplot)
-library(loo)
+library(tidyverse)
 
-hindi <- read_csv("analysis-workshop/data/Hindi_new.csv") %>%
-  mutate(
-    subject = factor(RECORDING_SESSION_LABEL),
-    item = factor(stim_num),
-    writing_system = if_else(cond_name %in% c("RL", "RH"), "Romance", "Traditional"),
-    frequency = if_else(cond_name %in% c("RH", "TH"), "High", "Low"),
-    writing_system = factor(writing_system),
-    frequency = factor(frequency)
-  ) %>%
-  filter(practice == "No", IA_SKIP == 0) %>%
-  mutate(
-    frd = if_else(
-      IA_FIRST_RUN_DWELL_TIME >= 80 & IA_FIRST_RUN_DWELL_TIME <= 2000,
-      IA_FIRST_RUN_DWELL_TIME,
-      NA_real_
-    )
-  )
-```
-
-## Decision checkpoint A: response family candidates
-
-- Candidate 1: `gaussian()` on `log(frd)`
-- Candidate 2: `shifted_lognormal()` on raw `frd`
-- Candidate 3: `exgaussian()` on raw `frd`
-
-**Decision strategy:** keep all three initially, then compare posterior predictive fit and LOO.
-
-## Step 2: scale and coding decisions
-
-```{r}
-#| eval: false
-hindi <- hindi %>%
-  mutate(log_frd = log(frd))
-
-contrasts(hindi$writing_system) <- contr.sum(2)
-contrasts(hindi$frequency) <- contr.sum(2)
-```
-
-- Sum coding keeps parameter interpretation aligned with Session 1
-
-## Step 3: priors based on plausible RT scale
-
-```{r}
-#| eval: false
-priors_gaussian <- c(
-  prior(normal(6, 0.6), class = "Intercept"),  # log-ms scale
-  prior(normal(0, 0.2), class = "b"),
-  prior(exponential(1), class = "sd"),
-  prior(lkj(2), class = "cor"),
-  prior(exponential(1), class = "sigma")
-)
-
-priors_rt <- c(
-  prior(normal(500, 250), class = "Intercept"),
-  prior(normal(0, 80), class = "b"),
-  prior(exponential(1), class = "sd"),
-  prior(lkj(2), class = "cor")
+# Define regularizing priors on the log/raw scale
+priors_exg <- c(
+  prior(normal(0.6, 0.2), class = "Intercept"),       # RT intercept (600ms)
+  prior(normal(0, 0.1), class = "b"),                 # Fixed effects on RT
+  prior(exponential(2), class = "sd"),                # Subject/Item variation
+  prior(lkj(2), class = "cor"),                       # Random correlation matrix
+  
+  # Priors for the exponential parameter beta
+  prior(normal(-1.5, 0.5), class = "Intercept", dpar = "beta"), 
+  prior(normal(0, 0.3), class = "b", dpar = "beta")
 )
 ```
 
-## Prior predictive check before fitting
+## Fitting ex-Gaussian in brms (Command)
 
 ```{r}
 #| eval: false
-fit_prior <- brm(
-  log_frd ~ writing_system * frequency + (1 + frequency | subject) + (1 + frequency | item),
-  data = hindi,
-  family = gaussian(),
-  prior = priors_gaussian,
-  sample_prior = "only",
-  chains = 4, iter = 2000, warmup = 1000
-)
-
-pp_check(fit_prior)
-```
-
-- **Decision:** if prior predictive mass is unrealistic, tighten priors before posterior fitting
-
-## Step 4: fit Gaussian model on log RT
-
-```{r}
-#| eval: false
-fit_gaussian <- brm(
-  log_frd ~ writing_system * frequency + (1 + frequency | subject) + (1 + frequency | item),
-  data = hindi,
-  family = gaussian(),
-  prior = priors_gaussian,
-  chains = 4, iter = 4000, warmup = 2000,
-  cores = 4,
-  control = list(adapt_delta = 0.95)
-)
-```
-
-## Step 5: fit shifted lognormal on raw RT
-
-```{r}
-#| eval: false
-fit_shifted <- brm(
-  frd ~ writing_system * frequency + (1 + frequency | subject) + (1 + frequency | item),
-  data = hindi,
-  family = shifted_lognormal(),
-  prior = priors_rt,
-  chains = 4, iter = 4000, warmup = 2000,
-  cores = 4,
-  control = list(adapt_delta = 0.98, max_treedepth = 12)
-)
-```
-
-## Optional: ex-Gaussian sensitivity model
-
-```{r}
-#| eval: false
-fit_exgaussian <- brm(
-  frd ~ writing_system * frequency + (1 + frequency | subject) + (1 + frequency | item),
-  data = hindi,
+# Fit ex-Gaussian model on Flanker Exp 1 correct RTs
+blmm_rt <- brm(
+  formula = bf(
+    rt ~ Condition * StimulusType + (Condition * StimulusType | subject) + (Condition | item),
+    beta ~ Condition * StimulusType + (Condition * StimulusType | subject) + (Condition | item)
+  ),
+  data = flanker_rt_data,
   family = exgaussian(),
-  prior = priors_rt,
+  prior = priors_exg,
   chains = 4, iter = 4000, warmup = 2000,
-  cores = 4,
-  control = list(adapt_delta = 0.98)
+  control = list(adapt_delta = 0.95),
+  cores = 4, backend = "cmdstanr"
 )
 ```
 
-## Diagnostics checkpoint B: sampler quality
+## Section 3: Modeling Accuracy (Bernoulli) {.dark-bg background-color="#1F497D"}
+
+## Bernoulli GLMM for Binary Accuracy
+
+For single-trial binary accuracy data (`corr` = 0 or 1), the binomial model is simplified to a **Bernoulli distribution** with a logit link function:
+
+$$\text{corr} \sim \text{Bernoulli}(p)$$
+$$\text{logit}(p) = \log\left(\frac{p}{1-p}\right) = X\beta + Z u$$
+
+This models the probability $p$ of a correct response directly on the log-odds scale, utilizing a maximal random effects structure:
+
+## Fitting Bernoulli in brms (Command)
 
 ```{r}
 #| eval: false
-summary(fit_shifted)
-plot(fit_shifted)
-mcmc_rhat(rhat(fit_shifted))
-mcmc_neff(neff_ratio(fit_shifted))
-```
-
-Minimum targets:
-
-- $\hat{R} < 1.01$
-- high effective sample size
-- zero divergences after warmup
-
-## Diagnostics checkpoint C: predictive adequacy
-
-```{r}
-#| eval: false
-pp_check(fit_gaussian, ndraws = 100)
-pp_check(fit_shifted, ndraws = 100)
-pp_check(fit_exgaussian, ndraws = 100)
-```
-
-- **Decision:** prefer the family that captures skew and tails with fewer systematic mismatches
-
-## Model comparison for final family choice
-
-```{r}
-#| eval: false
-loo_compare(
-  loo(fit_gaussian),
-  loo(fit_shifted),
-  loo(fit_exgaussian)
+# Fit Bernoulli multi-level model on all Flanker Exp 1 trials
+blmm_acc <- brm(
+  formula = corr ~ Condition * StimulusType + 
+    (Condition * StimulusType | subject) + 
+    (Condition | item),
+  data = flanker_clean,
+  family = bernoulli(link = "logit"),
+  prior = prior(normal(0, 1), class = "b"),
+  chains = 4, iter = 4000, warmup = 2000,
+  cores = 4, backend = "cmdstanr"
 )
 ```
 
-- **Decision rule:** if one model has clearly better expected out-of-sample fit and good diagnostics, adopt it as primary
+## Section 4: Modeling Eye Movements & Model Comparison {.dark-bg background-color="#1F497D"}
 
-## Posterior inference for hypotheses
+## Shifted Lognormal for Eye-Tracking
+
+Like manual reaction times, eye-tracking duration measures (e.g. Total Viewing Time `tvt`) are highly skewed.
+However, eye-tracking fixations have a **physiological minimum duration** (typically around 50–80 ms) below which a fixation cannot be registered.
+
+::: {.accent-box}
+### The Shifted Lognormal Distribution
+The **Shifted Lognormal** distribution models the outcome on a log scale but adds a shift parameter ($ndt$: non-decision time) representing this absolute physiological floor:
+$$\text{tvt} \sim \text{Lognormal}(\mu, \sigma) + ndt$$
+:::
+
+## Fitting Eye-Tracking LMM in brms (Command)
 
 ```{r}
 #| eval: false
-post <- spread_draws(fit_shifted, b_writing_system1, b_frequency1, `b_writing_system1:frequency1`)
-
-mean(post$b_frequency1 < 0)               # P(frequency effect is faster)
-mean(post$`b_writing_system1:frequency1` != 0)
+# Fit Shifted Lognormal LMM on Gaze-Contingent target word Total Viewing Time
+blmm_tvt <- brm(
+  formula = tvt ~ preview * number * target_gender + (1 | subject) + (1 | sentence_nr),
+  data = gaze_target %>% filter(tvt > 50 & tvt < 4000),
+  family = shifted_lognormal(),
+  prior = c(
+    prior(normal(5.5, 0.5), class = "Intercept"),
+    prior(normal(0, 0.2), class = "b"),
+    prior(exponential(1), class = "sd")
+  ),
+  chains = 4, iter = 4000, warmup = 2000,
+  cores = 4, backend = "cmdstanr"
+)
 ```
 
-- Report directional probabilities and 95% credible intervals
+## Bayesian MCMC Diagnostics
 
-## Marginal effects for interpretation
+Before interpreting posterior parameters, we MUST verify the sampling quality:
+
+1. **R-hat ($\hat{R}$):** Should be exactly $< 1.01$. Verifies that all chains converged onto the same posterior target.
+2. **Effective Sample Size (ESS):** Bulk and Tail ESS should be $> 1000$ to ensure stable posterior statistics.
+3. **Divergent Transitions:** Stan will warn if MCMC chains encounter numerical instability.
+   - *Fix:* Increase `control = list(adapt_delta = 0.98)`.
+
+## Posterior Predictive Checks
+
+A powerful feature of Bayesian models is simulating new datasets from the posterior and overlaying them on the actual data to see if the model successfully captured the shape, skewness, and boundaries:
+
+* **Visual Alignment:** We expect the simulated density curves to line up closely with the raw empirical data density.
+* **Warning Signs:** Mismatches in the peak height or tails indicate that the distribution family is poorly specified.
+
+## Generating Checks in R (Command)
 
 ```{r}
 #| eval: false
-conditional_effects(fit_shifted, effects = "writing_system:frequency")
+# Generate posterior predictive checks
+pp_check(blmm_rt, ndraws = 100)
+pp_check(blmm_tvt, ndraws = 100)
 ```
 
-- Use model-based estimated means instead of raw means for final interpretation
+## Model Comparison via LOO-CV
 
-## Example decision log (Bayesian)
+To compare competing models (e.g. whether a log-normal distribution or a shifted-lognormal distribution fits our eye-tracking data better), we use **Leave-One-Out Cross-Validation (LOO-CV)**:
 
-1. Reused Session 1 cleaning criteria for comparability
-2. Tested Gaussian(log RT), shifted lognormal, and ex-Gaussian likelihoods
-3. Ran prior predictive checks and adjusted priors to plausible RT range
-4. Increased `adapt_delta` when necessary to eliminate divergences
-5. Selected final model by combining diagnostics + LOO + theoretical plausibility
+* **Expected Log Predictive Density (`elpd`):** Quantifies expected out-of-sample predictive accuracy.
+* **Comparison Matrix:** Models are ordered by predictive performance. Competing models are compared to the best model using standard error differences.
 
-## Reporting template (Bayesian)
+## Computing LOO in R (Command)
 
-- **Model:** formula, family, priors, software/version
-- **Sampling:** chains, iterations, warmup, control settings
-- **Diagnostics:** $\hat{R}$, ESS, divergences, posterior predictive checks
-- **Comparison:** LOO/WAIC and rationale for final model
-- **Results:** posterior means/medians, credible intervals, directional probabilities
+```{r}
+#| eval: false
+# Compute LOO criteria
+loo_model1 <- loo(blmm_tvt)
+loo_model2 <- loo(blmm_tvt_lognormal)
 
-## Final autonomous assignment (2h independent work)
+# Compare expected log pointwise predictive density (elpd)
+loo_compare(loo_model1, loo_model2)
+```
 
-- Choose one dependent variable from your own project
-- Write a short decision log (cleaning + model + diagnostics)
-- Fit one frequentist and one Bayesian model for the same question
-- Submit a 1-page results-style report with justified model choice
+## Posterior Inferences & Hypothesis Testing
 
-## Closing clinic
+In the Bayesian framework, we do not need arbitrary $p$-values. We can draw posterior samples and directly compute the probability of our experimental hypotheses:
 
-- Translate your dissertation question into an explicit multilevel model
-- Identify one likely diagnostic failure point in advance
-- Define decision criteria before fitting final confirmatory model
+* **Directional Probability:** e.g., what is the probability that our concordant flanker effect is less than zero ($P(\beta < 0)$)?
+* **Credible Intervals:** Express uncertainty directly (e.g., "There is a $95\%$ probability that the true effect lies between $-35\text{ms}$ and $-5\text{ms}$").
+
+## Querying Posteriors in R (Command)
+
+```{r}
+#| eval: false
+library(tidybayes)
+
+# Get posterior samples for the flanker condition contrast
+post_samples <- blmm_rt %>%
+  spread_draws(b_ConditionCON_vs_AGR)
+
+# What is the probability that Concordant flankers are faster than Control?
+# (i.e. that the difference is negative)
+prob_faster <- mean(post_samples$b_ConditionCON_vs_AGR < 0)
+cat("P(Concordant < Control) =", prob_faster * 100, "%\n")
+```
+
+## Session 2 Summary
+
+1. **Bayesian Advantages:** Regularizing priors prevent singular fits, while flexible likelihood families model real-world distributions directly.
+2. **ex-Gaussian RTs:** Models core cognitive speed ($\mu$) and exponential skew tail ($\beta$) simultaneously.
+3. **Bernoulli Accuracy:** Fits single-trial binary accuracy without aggregation.
+4. **Shifted Lognormal Eye Movements:** Respects the physiological minimum duration limit of fixations.
+5. **MCMC Diagnostics & Verification:** Always verify $\hat{R} < 1.01$ and run `pp_check` to validate predictive accuracy.
+
+## References
+
+::: {#refs}
+:::
+

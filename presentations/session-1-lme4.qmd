@@ -1,289 +1,379 @@
 ---
 title: "Session 1: Frequentist Mixed-Effects Models with lme4"
-subtitle: "Data Analysis Workshop 2026"
+subtitle: "Grammatical Gender Flanker & Gaze-Contingent Boundary Paradigms"
 author: "Dr. Bernhard Angele"
 format:
   revealjs:
     incremental: true
+    theme: [simple, custom.scss]
+    logo: images/logo.png
+    slide-number: true
+    toc: false
+bibliography: references.bib
+csl: apa.csl
 ---
 
-## Session roadmap (3h)
+## Workshop plan
 
-- **Part 1 (35 min):** dataset, design, and research question
-- **Part 2 (55 min):** preprocessing decisions and exploratory plots
-- **Part 3 (60 min):** model building, diagnostics, and model revision
-- **Part 4 (30 min):** interpretation, reporting, and transition to Bayesian analysis
+Welcome to our workshop on analyzing data from experiments in cognitive psychology, and linguistics, and education using frequentist and Bayesian linear mixed models. 
 
-## This session uses one concrete dataset
+Here is the plan for this workshop:
 
-- Dataset: `analysis-workshop/data/Hindi_new.csv`
-- Paradigm: Hindi eye-tracking during reading
-- Design: 2 × 2 factorial (`writing_system` × `frequency`)
-- Outcome focus for Session 1: first-run dwell time (`IA_FIRST_RUN_DWELL_TIME`)
+- **Today**
+  - **Part 1** Introducing the workshop data sets
+  - **Part 2:** Data preprocessing, exclusions, and custom contrast coding
+  - **Part 3:** Linear mixed-effects modeling of response times (Gaussian) using `lme4`
 
-## Research question for the walkthrough
+## Part 1: Introduction to the Workshop Datasets {.dark-bg background-color="#C2002F"}
 
-Do writing system and lexical frequency influence first-pass reading time, while accounting for participant and item variability?
+## Parafoveal Processing of Articles in Spanish
 
-- H1: High-frequency targets are read faster
-- H2: Writing system influences processing time
-- H3: Frequency effect may differ by writing system
+Our workshop utilizes a dataset we recently published, exploring how readers process grammatical gender in Spanish:
 
-## Why mixed-effects models here?
+Experiment 1 from @serrano-carot2026lcn used a **word-flanker paradigm** to investigate how **parafoveal syntactic processing** occurs during single-word reading. Participants performed different tasks (Exp 1: grammatical gender categorization, Exp 2: lexical decision, Exp 3: semantic categorization) while being presented with target nouns flanked by either concordant, discordant, or neutral articles. In this session, we will focus on the data from Experiment 1, the grammatical gender categorization task.
 
-- Each participant contributes many trials
-- Each item appears across conditions
-- We need inference that generalizes to new participants and new items
-- This requires crossed random effects, not only fixed-effects ANOVA
+## Why Study Spanish Articles?
 
-## Analysis workflow we will follow
+Unlike English, which features a single gender-neutral definite article (*the*), Spanish has a morphosyntactically rich article system:
 
-1. Load and inspect raw data
-2. Recode factors from `cond_name`
-3. Make explicit cleaning decisions
-4. Visualize distributions and condition means
-5. Fit maximal design-justified model
-6. Diagnose warnings and simplify if needed
-7. Report effects and model decisions transparently
+* **Gender Agreement:** *el* (masculine), *la* (feminine)
+* **Number Agreement:** *los* (masculine plural), *las* (feminine plural)
 
-## Step 1: load packages and data
+This rich variation makes Spanish an ideal linguistic test-case for investigating **parafoveal syntactic processing** [@angele2013].
+
+## The Grammatical Gender Agreement Effect
+
+* **Linguistic Rule:** Spanish articles must agree in gender and number with the noun they modify [@corbett1991].
+* **Violations:** Agreements like **\*el mesa** (masculine article + feminine noun) cause severe cognitive disruption:
+  - Delayed response times in foveal categorization and lexical decisions [@barber2005].
+  - Distinct neurophysiological ERP signatures, such as the **P600** component [@alemánbañón2016].
+* **Core Research Question:** Are these syntactically complex agreement rules processed *parafoveally* before fixating the noun?
+
+
+## Dataset: Grammatical Gender Flanker (Exp 1)
+
+- **Source Study:** @serrano-carot2026lcn
+- **Task:** Noun grammatical gender decision task. Participants decide if a target noun (e.g., *mesa*, feminine; *sol*, masculine) is masculine or feminine.
+- **Flanker Design:** The target noun is flanked by articles that are either:
+  - **Concordant (`AGR`):** Flankers agree in gender (e.g., *la mesa la*).
+  - **Discordant (`DIS`):** Flankers mismatch in gender (e.g., *el mesa el*).
+  - **Control (`CON`):** Non-gender characters flanking the noun.
+- **Key Outcomes:** Response Time (`rt` in seconds) and Response Accuracy (`corr`: 1 = correct, 0 = incorrect).
+
+## Flanker Paradigm: Conditions
+
+:::: {.columns}
+::: {.column width="33%"}
+**Control (`CON`):**
+```{=html}
+<div class="flanker-container">
+  <div class="flanker-stage cross">+</div>
+  <div class="flanker-stage stimulus">mesa</div>
+  <div class="flanker-stage target-only">mesa</div>
+  <div class="flanker-stage feedback-correct">✅</div>
+  <div class="flanker-stage feedback-incorrect">❌</div>
+</div>
+```
+No flankers (target presented on its own).
+:::
+
+::: {.column width="33%"}
+**Concordant (`AGR`):**
+```{=html}
+<div class="flanker-container">
+  <div class="flanker-stage cross">+</div>
+  <div class="flanker-stage stimulus">la&nbsp;&nbsp;mesa&nbsp;&nbsp;la</div>
+  <div class="flanker-stage target-only">mesa</div>
+  <div class="flanker-stage feedback-correct">✅</div>
+  <div class="flanker-stage feedback-incorrect">❌</div>
+</div>
+```
+Flankers agree in grammatical gender.
+:::
+
+::: {.column width="33%"}
+**Discordant (`DIS`):**
+```{=html}
+<div class="flanker-container">
+  <div class="flanker-stage cross">+</div>
+  <div class="flanker-stage stimulus">el&nbsp;&nbsp;mesa&nbsp;&nbsp;el</div>
+  <div class="flanker-stage target-only">mesa</div>
+  <div class="flanker-stage feedback-correct">✅</div>
+  <div class="flanker-stage feedback-incorrect">❌</div>
+</div>
+```
+Flankers violate gender agreement.
+:::
+::::
+
+---
+
+## Section 2: Data Preprocessing & Custom Contrasts {.dark-bg background-color="#C2002F"}
+
+## Introduction to the Tidyverse
+
+We will use the **tidyverse** ecosystem for all data preprocessing, cleaning, and visualization.
+
+* **What is it?** An opinionated collection of modern R packages designed for data science.
+* **Why use it?** 
+  - Packages share a common philosophy, design token, and grammar.
+  - Expressive syntax (`%>%` pipe operator) that reads like a sequence of actions.
+  - Highly efficient for transforming messy experimental logs into analysis-ready data frames.
+* **Core Packages in Our Workflow:**
+  - `readr`: Fast, friendly reading of CSV files.
+  - `dplyr`: Data manipulation verbs like `filter()`, `mutate()`, and `select()`.
+  - `ggplot2`: Data visualization based on the grammar of graphics.
+
+## Flanker Experiment Dataset Structure
+
+The raw dataset `data/exp1_data_for_analysis.csv` contains trial-level experimental logs:
+
+::: {style="font-size: 0.65em;"}
+
+| Column | Type | Description | Example |
+|---|---|---|---|
+| `subject` | integer | Unique subject index | `1` |
+| `Target` | character | Target noun presented on the screen | `"mesa"` |
+| `Condition` | character | Flanker condition (`CON`, `AGR`, `DIS`) | `"AGR"` |
+| `StimulusType` | character | Target grammatical gender (`MAS` or `FEM`) | `"FEM"` |
+| `rt` | numeric | Reaction time in seconds | `0.3273` |
+| `corr` | integer | Accuracy (`1` = correct, `0` = incorrect, `-1` = timeout) | `1` |
+| `Flanker` | character | Specific article flanking the noun | `"la"` |
+
+: Key columns of the flanker experiment dataset {.striped .hover}
+
+:::
+
+## Step 1: Preprocessing the Flanker Data
+
+Before fitting models, we must apply standard exclusions to filter out noise:
+
+1. **Timeout Exclusions:** Exclude trials where participants timed out (`corr == -1`).
+2. **Physiological Plausibility Window:** Retain manual reaction times strictly between $250\text{ ms}$ and $1800\text{ ms}$ ($0.25\text{s} - 1.8\text{s}$).
+3. **Counterbalancing & Subject Factors:** Cast key variables (Subject, Target Word, Condition, Gender) as clean factors in R.
+
+## Loading & Cleaning in R
 
 ```{r}
-#| eval: false
+#| eval: true
+#| echo: false
 library(tidyverse)
 library(lme4)
-library(lmerTest)
-library(emmeans)
-library(performance)
+library(MASS)
+library(here)
 
-hindi_raw <- read_csv("analysis-workshop/data/Hindi_new.csv")
-```
+# Load Flanker Exp 1 data
+flanker_raw <- read_csv(here("data/exp1_data_for_analysis.csv"))
 
-## Step 2: inspect raw structure
-
-```{r}
-#| eval: false
-glimpse(hindi_raw)
-summary(hindi_raw$IA_FIRST_RUN_DWELL_TIME)
-table(hindi_raw$cond_name, useNA = "ifany")
-```
-
-- Check if all four conditions are present (`RL`, `RH`, `TL`, `TH`)
-- Check missingness and implausible values before modeling
-
-## Step 3: recode experimental factors
-
-```{r}
-#| eval: false
-hindi <- hindi_raw %>%
+# Exclude timeouts and extreme response times
+flanker_clean <- flanker_raw %>%
+  filter(
+    corr != -1,
+    rt >= 0.25 & rt <= 1.8
+  ) %>%
   mutate(
-    subject = factor(RECORDING_SESSION_LABEL),
-    item = factor(stim_num),
-    writing_system = case_when(
-      cond_name %in% c("RL", "RH") ~ "Romance",
-      cond_name %in% c("TL", "TH") ~ "Traditional"
-    ),
-    frequency = case_when(
-      cond_name %in% c("RH", "TH") ~ "High",
-      cond_name %in% c("RL", "TL") ~ "Low"
-    ),
-    writing_system = factor(writing_system),
-    frequency = factor(frequency)
+    Condition = factor(Condition, levels = c("CON", "AGR", "DIS")),
+    StimulusType = factor(StimulusType, levels = c("MAS", "FEM")),
+    subject = factor(PROLIFIC_PID),
+    item = factor(Target)
   )
 ```
 
-## Decision checkpoint A: which rows are valid trials?
+## Step 2: Contrast Coding
 
-- **Decision:** exclude practice trials
-- **Decision:** keep only fixated targets (`IA_SKIP == 0`)
-- **Reason:** practice and skipped targets are not valid for first-pass duration modeling
+We have three levels in `Condition` (`CON`, `AGR`, `DIS`). We need to think about what comparisons are the most interesting for us theoretically. In this case, we care mainly about the impact of the dissimilar flankers (DIS) compared to the other two conditions. 
+We also wonder whether the concorndant flanker has a facilitation effect compared to the control (CON).
+
+- Why don't we just use the default treatment contrasts? They would compare each level to a baseline (e.g., `CON`). This would not be terrible, but we would lose out on the direct comparison between `AGR` and `DIS`, which is where we would expect the largest difference if the flankers are indeed processed parafoveally. In this case, we decide to use **custom contrasts** to examine the effect of the discordant flanker compared to the concordant and control conditions (i.e., we test the hypothesis that $\frac{AGR+CON}{2} - DIS = 0$) and and the effect of the concordant flanker compared to the control ($AGR - CON = 0$).
+
+## Custom Contrast Coding
+
+We define a **custom contrast matrix** to test:
+
+1. **CON vs AGR (Facilitation):** Does a concordant flanker help compared to a neutral control? $1 \cdot AGR - 1 \cdot CON + 0 \cdot DIS = 0$
+2. **CON & AGR vs DIS (Interference):** Does a discordant flanker slow down processing compared to the other conditions? $0.5 \cdot AGR + 0.5 \cdot CON - 1 \cdot DIS = 0$
+
+- We can specify this contrast matrix in the differences format: 
+
+| Condition | CON vs AGR | (CON & AGR) vs DIS |
+|---|---|---|
+| CON | -1 | 0.5 |
+| AGR | 1 | 0.5 | 
+| DIS | 0 | -1 |
+
+## Stimulus Type
+
+* We might also want to test whether there is a difference in processing between masculine and feminine nouns. We can use **sum contrasts** for this factor, which will compare each level to the grand mean (i.e., `MAS` vs `FEM`). For this, we can use the R command `contr.sum(2)` and don't have to worry about the general inverse. The contrast will automatically be correctly coded as `MAS = 0.5` and `FEM = -0.5`.
+
+## Orthogonality of Contrasts
+
+* Why did we use the specific custom contrasts for `Condition` and sum contrasts for `StimulusType`? 
+    * This ensures that all the contrasts are **orthogonal** (i.e., uncorrelated). When we use correlated predictors in a regression model, this can reduce both the interpretability and statistical power of our model.
+* If the model includes interactions, non-orthogonal contrasts can lead to high degrees of multicollinearity, which can inflate standard errors and make it difficult to detect significant effects. By using orthogonal contrasts, we can ensure that each contrast tests a unique aspect of the data without overlap.
+
+## Contrast Setup in R
 
 ```{r}
-#| eval: false
-hindi <- hindi %>%
-  filter(practice == "No", IA_SKIP == 0)
+#| eval: true
+# Define custom hypothesis contrast matrix
+contr_matrix <- matrix(c(
+   1, -1,  0,    # Contrast 1: CON vs AGR
+   0.5, 0.5, -1  # Contrast 2: (CON + AGR) vs DIS
+), nrow = 3, dimnames = list(c("CON", "AGR", "DIS"), c("CON_vs_AGR", "CON_AGR_vs_DIS")))
+
+# Apply the generalized inverse to map contrasts onto regression coefficients
+contr_matrix_inv <- zapsmall(t(ginv(contr_matrix))) %>%
+  matrix(nrow = 3, dimnames = list(c("CON", "AGR", "DIS"), c("CON_vs_AGR", "CON_AGR_vs_DIS")))
+
+# Assign to factor Condition
+contrasts(flanker_clean$Condition) <- contr_matrix_inv
+contrasts(flanker_clean$StimulusType) <- contr.sum(2) # Sum code Gender (-1, 1)
+
+# Filter correct trials for LMM
+flanker_rt_data <- flanker_clean %>% filter(corr == 1)
 ```
 
-## Decision checkpoint B: plausible RT window
+## Why the generalized inverse?
 
-- Eye-tracking durations can include sensor/mapping artifacts
-- **Decision:** keep first-run dwell times between 80 and 2000 ms
-- **Reason:** remove implausibly short/long values while keeping realistic cognitive variability
+- There are two ways to specify contrasts in R: the **differences format** (where each row corresponds to a condition and columns correspond to contrasts) and the **regression format** (where each column corresponds to a regression coefficient). The `contrasts()` function in R expects the regression format, so we use the generalized inverse (`ginv()`) from the `MASS` package to convert our differences contrast matrix into the appropriate regression format.
+
+- We could specify the contrasts directly in regression format, but using the differences format is often more intuitive when designing contrasts based on theoretical hypotheses.
+
+- `t()` transposes the matrix (rows to columns and vice versa), and `zapsmall()` is used to clean up any very small numerical values that may arise from the calculation (rounding errors).
+
+- For a detailed explanation of contrast coding and the use of the generalized inverse, see @schad2020capitalize.
+
+## Section 3: Mixed-Effects Modeling: RT & Accuracy {.dark-bg background-color="#C2002F"}
+
+## Why do we need mixed-effects models here?
+
+Independence assumptions of traditional ANOVA are violated in our experimental design:
+
+- **Repeated Measures:** Each participant contributes multiple trials. All measurements from the same participant share variance and are not independent.
+
+- **Crossed Items:** Target words are repeated across subjects. Measurements from the same item may also share variance and not be independent.
+
+- The **Language-as-fixed-effect fallacy:** ANOVAs can only model one source of random variability (e.g., subjects or items), but not both simultaneously [@clark1973language]. This can lead to inflated Type I error rates and incorrect inferences about our fixed effects [@raaijmakers1999deal].
+
+## Fit the full random effects structure
+* **Important note:** Unlike repeated measures ANOVAS, linear mixed models allow us to specify which random effects of subject or item we want to include. We can include:
+  - **Random Intercepts:** Account for baseline differences in response times across subjects and items (the "main" effect of subject/item).
+  - **Random Slopes:** Account for how the effect of our experimental conditions (e.g., Condition, StimulusType) may vary across subjects and items. For example, some subjects may show a larger flanker effect than others, and some items may be more affected by the flanker manipulation than others. This is the "interaction" of subject/item with our fixed effects.
+
+* The equivalent of an F1 ANOVA is not an LMM with only random subject intercepts. It is an LMM with random intercepts and slopes for subjects. If we do not include random slopes, but there are random effects in the data, these may be confounded with fixed effects, inflating Type I error rates [@barr2013].
+
+## Problems with maximal random effects structures in *lme4*
+
+* **Convergence Issues:** If there are no systematic random effects in the data, the model may fail to converge instead of estimating a variance of zero. However, a failure to converge does not necessarily mean that there is no random effect in the data. 
+* **Power Issues:** Even if the model converges, it may require a substantially larger sample size to detect fixed effects while also estimating a complex random effects structure. This can lead to Type II errors [failing to detect a true effect, @matuschek2017balancing].
+
+## Fitting LMM in R (Command)
+
+We fit a linear mixed-effects model on correct trials, modeling reaction times (`rt`) as a Gaussian outcome using the `lme4` package.
+
+- **Question**: Why do we include StimulusType as a random slope for subjects but not items? 
+  - Because each item only has one gender!
 
 ```{r}
 #| eval: false
-hindi <- hindi %>%
-  mutate(
-    frd = if_else(
-      IA_FIRST_RUN_DWELL_TIME >= 80 & IA_FIRST_RUN_DWELL_TIME <= 2000,
-      IA_FIRST_RUN_DWELL_TIME,
-      NA_real_
-    )
+
+m_rt <- lmer(
+  rt ~ Condition * StimulusType + 
+    (1 + Condition * StimulusType | subject) + 
+    (1 + Condition | item),
+  data = flanker_rt_data
   )
 ```
 
-## Audit the impact of cleaning decisions
+## This does not converge!
+
+- What to do?
+- Simplify the random effects structure. We can start by removing correlations between random effects using the double-pipe syntax `||` in `lme4`. This will allow the model to estimate variances for each random effect without estimating correlations between them. Since the correlations will often be close to zero, this can help with convergence without losing much information about the random effects structure.
 
 ```{r}
 #| eval: false
-hindi %>%
-  summarise(
-    n_rows = n(),
-    missing_frd = sum(is.na(frd)),
-    missing_rate = mean(is.na(frd))
-  )
+m_rt <- lmer(
+  rt ~ Condition * StimulusType + 
+    (1 + Condition * StimulusType || subject) + 
+    (1 + Condition || item),
+  data = flanker_rt_data
+)
 ```
 
-- Always report how many observations were excluded and why
+## Still does not converge!
 
-## Descriptive statistics by condition
+- Now we can systematically remove random slopes that we suspect have low variance (e.g., target item slopes) while retaining slopes directly tied to our primary hypothesis (e.g., Condition slopes for subjects). This is a common approach to achieve convergence while still modeling the most important sources of random variability in the data.
 
 ```{r}
-#| eval: false
-hindi %>%
-  group_by(writing_system, frequency) %>%
-  summarise(
-    n = sum(!is.na(frd)),
-    mean_frd = mean(frd, na.rm = TRUE),
-    sd_frd = sd(frd, na.rm = TRUE)
-  )
+#| eval: true
+#| cache: true
+m_rt <- lmer(
+  rt ~ Condition * StimulusType + 
+    (1 + Condition || subject) + 
+    (1 | item),
+  data = flanker_rt_data
+)
+``` 
+- Note that we cannot use `||` in the `(1 | item)` term since there is only one random effect here.
+
+## This converges!
+
+We inspect the results using `summary(m_rt)` to retrieve the parameters and statistics:
+
+```{r}
+summary(m_rt)
 ```
 
-## Visual check: condition distributions
+## Interpreting the model output:
+- **Fixed Effects Estimates ($b$):** Coefficients representing the influence of Condition and Gender (StimulusType) on response times.
+- **Random Effects Variances:** Subject-level and Item-level standard deviations.
+- **Optimizer Checks:** Verify model convergence and inspect fit statistics.
+- **Correlation matrix:** Check for correlations between fixed effects. High correlations (|r| > 0.7) can indicate multicollinearity.
 
+## Interpreting the results:
+
+- **Main Effect of Condition:** 
+  - **Contrast 1:** Significant negative $b$ for `CON_vs_AGR` indicates that the concordant flanker condition leads to faster response times compared to the control, consistent with a facilitation account.
+  - **Contrast 2:** Significant negative $b$ for `CON_AGR_vs_DIS` indicates that the discordant flanker condition leads to slower response times compared to the other conditions, consistent with an interference account.
+- **Main Effect of StimulusType:** Significant positive $b$ for `StimulusType` indicates that masculine nouns (coded as 0.5) are processed slower than feminine nouns (coded as -0.5).
+- **Interaction:** No significant interaction terms suggests that the flanker effects do not differ between masculine and feminine nouns.
+
+## Issues with this model:
+ - Normality of residuals may be violated due to the right-skewed distribution of response times.
+ - Let's have a look at the distribution of the residuals:
 ```{r}
-#| eval: false
-ggplot(hindi, aes(x = writing_system, y = frd, fill = frequency)) +
-  geom_boxplot(outlier.shape = NA, alpha = .5) +
-  geom_jitter(width = .15, alpha = .15, size = .8) +
-  labs(
-    x = "Writing system",
-    y = "First-run dwell time (ms)",
-    fill = "Frequency"
-  ) +
+#| eval: true
+# ggplot of residual distribution
+residuals <- resid(m_rt)
+ggplot(data.frame(residuals), aes(x = residuals)) +
+  geom_histogram(binwidth = 0.05, fill = "steelblue", color = "black") +
+  labs(title = "Distribution of Residuals", x = "Residuals", y = "Frequency") +
   theme_minimal()
-```
+``` 
 
-## Modeling decision C: transform or not?
 
-- Raw dwell times are typically right-skewed
-- We compare:
-  - `frd` model on raw scale
-  - `log_frd` model on log scale
-- **Decision rule:** prefer log model if residual diagnostics improve clearly
+## Normality of Residuals
+- This does not look like a normal distribution, which violates the assumptions of the linear mixed model. We could try to log-transform the response times to see if that helps with normality, but this can make interpretation more difficult and may not fully address the issue of skewness [@lo2015transform]. 
+- We will address this in the next session using Bayesian modeling with `brms` and ex-Gaussian distributions.
 
-```{r}
-#| eval: false
-hindi <- hindi %>% mutate(log_frd = log(frd))
-```
+## Summary of Session 1
 
-## Contrast coding decision
+- We introduced a dataset from a flanker experiment that investigates parafoveal processing of articles with concordant or discordant grammatical gender in Spanish.
+- We applied standard preprocessing steps to clean the data and defined custom contrasts to test our specific hypotheses about the effects of the flanker conditions.
+- We were unable to fit a maximal random effects structure due to convergence issues, which is a common problem in `lme4`. We simplified the random effects structure while retaining the most important random slopes related to our primary hypotheses.
 
-- With interactions, default treatment coding can obscure main effects
-- **Decision:** use sum coding to interpret main effects as grand-mean deviations
+## Summary of Session 1 (continued)
 
-```{r}
-#| eval: false
-contrasts(hindi$writing_system) <- contr.sum(2)
-contrasts(hindi$frequency) <- contr.sum(2)
-```
+- The fitted model revealed significant facilitation effects for the concordant flankers and significant interference effects for the discordant flankers, as well as a main effect of stimulus type.
+- There were issues with our fitted model: we were not able to fit the maximal random effects structure, and the residuals of the model were not normally distributed due to the skewed distribution of response times. We will address these issues in the next session using Bayesian modeling with `brms` and ex-Gaussian distributions.
 
-## Maximal design-justified model
+## Homework for Session 2
 
-```{r}
-#| eval: false
-m_max <- lmer(
-  log_frd ~ writing_system * frequency +
-    (1 + writing_system * frequency | subject) +
-    (1 + writing_system * frequency | item),
-  data = hindi,
-  REML = FALSE,
-  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
-)
-```
+- Find a data set from your own research or from the literature that you would like to analyze using linear mixed models. It should ideally have a similar structure to the flanker dataset (i.e., repeated measures with crossed random effects of subjects and items).
+- Follow the same preprocessing steps we applied to the flanker data (e.g., data cleaning, applying contrast coding) and fit a linear mixed model using `lme4`. Try to include a maximal random effects structure and see if it converges. If not, try simplifying the random effects structure while retaining the most important random slopes.
 
-## Typical issue: singular fit
+## References
 
-- In small/medium samples, full random-correlation structures may be overparameterized
-- **Decision:** remove random-effect correlations first (`||`) before dropping slopes
+::: {#refs}
+:::
 
-```{r}
-#| eval: false
-m_uncor <- lmer(
-  log_frd ~ writing_system * frequency +
-    (1 + writing_system * frequency || subject) +
-    (1 + writing_system * frequency || item),
-  data = hindi,
-  REML = FALSE
-)
-```
-
-## If singularity persists: principled simplification
-
-- Keep slopes directly tied to confirmatory hypotheses
-- Remove weakest/least identifiable slope terms one step at a time
-- Save every model variant and diagnostic result
-
-```{r}
-#| eval: false
-m_final <- lmer(
-  log_frd ~ writing_system * frequency +
-    (1 + frequency || subject) +
-    (1 + frequency || item),
-  data = hindi,
-  REML = FALSE
-)
-```
-
-## Diagnostics checklist for final model
-
-```{r}
-#| eval: false
-isSingular(m_final, tol = 1e-4)
-check_model(m_final)
-anova(m_final)
-```
-
-- Convergence warning absent
-- Singularity status acceptable
-- Residual patterns reasonable for interpretation
-
-## Effect estimation and planned comparisons
-
-```{r}
-#| eval: false
-summary(m_final)
-emmeans(m_final, ~ writing_system * frequency)
-pairs(emmeans(m_final, ~ frequency | writing_system))
-```
-
-## Example decision log (report this in Methods)
-
-1. Excluded practice trials and skipped targets (`IA_SKIP == 1`)
-2. Winsorized by exclusion window (80–2000 ms on first-run dwell)
-3. Used log-transformed dependent variable after skew inspection
-4. Started maximal random structure, simplified by removing correlations first
-5. Retained interaction term because theoretically predicted
-
-## Reporting template (frequentist)
-
-- **Data processing:** exclusion criteria and retained sample size
-- **Model formula:** fixed effects and random-effects structure
-- **Diagnostics:** convergence/singularity and residual checks
-- **Results:** fixed effects (estimate, SE, t, p, CI) + estimated marginal means
-- **Transparency:** what was tried and why final model was chosen
-
-## Bridge to Session 2 (Bayesian)
-
-- We will keep the **same dataset and research question**
-- We will revisit key decisions:
-  - likelihood family
-  - random-effects regularization
-  - interpretation of uncertainty
-- This makes frequentist vs Bayesian choices directly comparable
-
-## Key references
-
-- Barr, D. J., Levy, R., Scheepers, C., & Tily, H. J. (2013). Random effects structure for confirmatory hypothesis testing: Keep it maximal. *Journal of Memory and Language, 68*(3), 255-278.
-- Matuschek, H., Kliegl, R., Vasishth, S., Baayen, H., & Bates, D. (2017). Balancing Type I error and power in linear mixed models. *Journal of Memory and Language, 94*, 305-315.
-- Bates, D., Mächler, M., Bolker, B., & Walker, S. (2015). Fitting linear mixed-effects models using lme4. *Journal of Statistical Software, 67*(1), 1-48.
