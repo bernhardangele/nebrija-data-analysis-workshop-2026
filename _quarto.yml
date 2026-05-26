@@ -3,7 +3,9 @@ project:
 
 format:
   revealjs:
-    theme: simple
+    theme: [simple, custom.scss]
+    logo: images/logo.png
+    css: animation_styles.css
     slide-number: true
     toc: true
 
