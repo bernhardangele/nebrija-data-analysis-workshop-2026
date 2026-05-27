@@ -170,8 +170,9 @@ fit_exgaussian_mu_beta <- brm(
     prior(exponential(2), class = "sd", dpar = "beta")
   ),
   chains = 4, iter = 2000, warmup = 1000,
-  control = list(adapt_delta = 0.95),
-  cores = 4, backend = "cmdstanr"
+  control = list(adapt_delta = 0.8),
+  cores = 4, backend = "cmdstanr",
+  threads = threading(2)
 )
 
 # Save Model 3
