@@ -183,7 +183,7 @@ flanker_clean <- flanker_raw %>%
 
 ## Step 2: Contrast Coding
 
-We have three levels in `Condition` (`CON`, `AGR`, `DIS`). We need to think about what comparisons are the most interesting for us theoretically. In this case, we care mainly about the impact of the dissimilar flankers (DIS) compared to the other two conditions. 
+We have three levels in `Condition` (`CON`, `AGR`, `DIS`). We need to think about what comparisons are the most interesting for us theoretically. In this case, we care mainly about the impact of the discordant flankers (DIS) compared to the other two conditions. 
 We also wonder whether the concorndant flanker has a facilitation effect compared to the control (CON).
 
 - Why don't we just use the default treatment contrasts? They would compare each level to a baseline (e.g., `CON`). This would not be terrible, but we would lose out on the direct comparison between `AGR` and `DIS`, which is where we would expect the largest difference if the flankers are indeed processed parafoveally. In this case, we decide to use **custom contrasts** to examine the effect of the discordant flanker compared to the concordant and control conditions (i.e., we test the hypothesis that $\frac{AGR+CON}{2} - DIS = 0$) and and the effect of the concordant flanker compared to the control ($AGR - CON = 0$).
@@ -205,7 +205,7 @@ We define a **custom contrast matrix** to test:
 
 ## Stimulus Type
 
-* We might also want to test whether there is a difference in processing between masculine and feminine nouns. We can use **sum contrasts** for this factor, which will compare each level to the grand mean (i.e., `MAS` vs `FEM`). For this, we can use the R command `contr.sum(2)` and don't have to worry about the general inverse. The contrast will automatically be correctly coded as `MAS = 0.5` and `FEM = -0.5`.
+* We might also want to test whether there is a difference in processing between masculine and feminine nouns. We can use **sum contrasts** for this factor, which will compare each level to the grand mean (i.e., `MAS` vs `FEM`). For this, we can use the R command `contr.sum(2)` and don't have to worry about the general inverse. The contrast will automatically be correctly coded as `MAS = 1` and `FEM = -1`.
 
 ## Orthogonality of Contrasts
 
@@ -337,7 +337,7 @@ summary(m_rt)
 - **Main Effect of Condition:** 
   - **Contrast 1:** Significant negative $b$ for `CON_vs_AGR` indicates that the concordant flanker condition leads to faster response times compared to the control, consistent with a facilitation account.
   - **Contrast 2:** Significant negative $b$ for `CON_AGR_vs_DIS` indicates that the discordant flanker condition leads to slower response times compared to the other conditions, consistent with an interference account.
-- **Main Effect of StimulusType:** Significant positive $b$ for `StimulusType` indicates that masculine nouns (coded as 0.5) are processed slower than feminine nouns (coded as -0.5).
+- **Main Effect of StimulusType:** Significant positive $b$ for `StimulusType` indicates that masculine nouns (coded as 1) are processed slower than feminine nouns (coded as -1).
 - **Interaction:** No significant interaction terms suggests that the flanker effects do not differ between masculine and feminine nouns.
 
 ## Issues with this model:
