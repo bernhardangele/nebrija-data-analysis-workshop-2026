@@ -156,6 +156,7 @@ fit_exgaussian_mu_beta <- brm(
   formula = formula_mu_beta,
   data = flanker_rt_data,
   family = exgaussian(),
+  init = 0,
   prior = c(
     # mu priors
     #prior(normal(0.6, 0.2), class = "Intercept"),
