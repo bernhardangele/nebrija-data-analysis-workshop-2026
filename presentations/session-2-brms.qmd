@@ -44,13 +44,412 @@ Yesterday, we have seen that frequentist models (`lme4`) suffer from critical li
 
 - In frequentist statistics, we set up a "straw man" hypothesis (the null) and compute the probability of observing our data (or more extreme) if the null were true. This is the $p$-value, a probability of the data given a hypothesis (the hypothesis that the parameter specifying the size of our effect is zero). The $p$-value is often misinterpreted as the probability that our hypothesis is true, which it is not.
 - Bayesian inference allows us directly estimate the probability of our hypotheses (or, more generally, the parameters of our model) given the data. This is done by combining our prior beliefs (priors) with the likelihood of the observed data to obtain a posterior distribution over our parameters of interest.
-- Bayes' theorem formalizes this process:
+
+## Bayes' Theorem
+
+Bayes' theorem formalizes the process of updating our beliefs about parameters $\theta$ in light of new data $D$:
 $$P(\theta | D) = \frac{P(D | \theta) P(\theta)}{P(D)}$$
 Where:
+
 - $P(\theta | D)$ is the posterior distribution of the parameters $\theta$ given the data $D$.
 - $P(D | \theta)$ is the likelihood of the data given the parameters.
 - $P(\theta)$ is the prior distribution of the parameters.
 - $P(D)$ is the marginal likelihood of the data, which serves as a normalizing constant.
+
+The new probability distribution $P(\theta | D)$ (the posterior) can become the prior for the next round of data collection, allowing for continuous updating of our beliefs as we gather more evidence.
+
+## Why doesn't everyone use Bayesian models?
+
+- **Computational Complexity:** Frequentist statistics rely on very simple probability distributions and many methods have closed-form solutions. You can literally do an ANOVA with a calculator!  
+  - Of course, linear mixed models introduce computational complexity of their own. They are still usually much faster to fit (unless you specify a model with convergence issues!). 
+  - Bayesian models, on the other hand, normally require Markov Chain Monte Carlo (MCMC) sampling to approximate the posterior distribution, which can be computationally intensive, especially for complex models or large datasets.
+    * However, modern hardware and efficient algorithms (e.g., Hamiltonian Monte Carlo) are perfectly capable of fitting Bayesian models in a reasonable time frame. 
+    * Your laptop can probably do it, although you may want to take a break and get a coffee while it runs.
+
+## Why doesn't everyone use Bayesian models? (continued)
+
+- **Steep Learning Curve:** Bayesian statistics require a different way of thinking about probability and inference. It can be challenging for those trained in the frequentist paradigm to understand concepts like priors, posteriors, and credible intervals.
+  - **Software and Tools:** Software like `brms` has made Bayesian modeling as easy as fitting an LMM in `lme4`. 
+    * There is a danger here, since you do not have to understand the underlying mechanics to fit a Bayesian model that you may then be unable to interpret correctly!
+
+## How does MCMC work?
+
+- **Markov Chain Monte Carlo (MCMC)** allows us to sample from complex, high-dimensional posterior distributions that cannot be solved analytically.
+- By sampling the posterior distribution one point at a time, we avoid the need to compute the marginal likelihood $P(D)$, which be very difficult to calculate. Instead, we can approximate the posterior distribution by generating a large number of samples from it.
+
+## Metropolis-Hastings Algorithm
+
+1. **Start:** Place a random walker at an initial state $\theta$.
+2. **Propose:** Propose a candidate state $\theta_{\text{proposed}}$ from a symmetric proposal distribution (e.g., Gaussian step size).
+3. **Acceptance Ratio:** Compute the probability ratio:
+   $$\alpha = \frac{P(\theta_{\text{proposed}} | D)}{P(\theta_{\text{current}} | D)}$$
+4. **Decision:**
+    - If $\alpha \ge 1$: **Accept** the move.
+    - If $\alpha < 1$: **Accept with probability $\alpha$**. Otherwise, **reject** and stay at the current state.
+
+- This works: The samples will be a representative draw from the true posterior distribution. If the proposal distribution is not symmetric, we can adjust the acceptance ratio to account for the asymmetry, but the core idea remains the same.
+
+## Metropolis-Hastings: The Mathematical Trick
+
+MH compares the posterior probability of the proposed state to the current state:
+
+$$\alpha = \frac{P(\theta_{\text{proposed}} | D)}{P(\theta_{\text{current}} | D)}$$
+
+Let's expand that using Bayes' theorem:
+
+$$\alpha = \frac{\frac{P(D | \theta_{\text{proposed}}) P(\theta_{\text{proposed}})}{P(D)}}{\frac{P(D | \theta_{\text{current}}) P(\theta_{\text{current}})}{P(D)}}$$
+
+::: {.accent-box}
+Notice what happens to the impossible-to-calculate denominator, $P(D)$: **It completely cancels out!**
+
+$$\alpha = \frac{P(D | \theta_{\text{proposed}}) P(\theta_{\text{proposed}})}{P(D | \theta_{\text{current}}) P(\theta_{\text{current}})}$$
+:::
+
+## Simulating MCMC Sampling
+
+```{=html}
+<div id="mcmc-card" style="background: #1e1e24; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); color: #e2e8f0; font-family: monospace; display: flex; flex-direction: column; align-items: center; max-width: 780px; margin: 0 auto;">
+    <h4 style="margin: 0 0 5px 0; color: #a5b4fc; font-size: 16px;">MCMC Joint, Marginal & Parameter Chain Sampler</h4>
+    <p style="margin: 0 0 10px 0; font-size: 11px; color: #a1a1aa; text-align: center;">Concentric rings: target contours. Histograms: empirical margins. Right: trace plot chains.</p>
+    
+    <canvas id="mcmcCanvas" width="750" height="450" style="border: 1px solid #3f3f46; border-radius: 6px; background: #09090b; display: block;"></canvas>
+    
+    <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 12px;">
+        <label for="speedSlider">Speed:</label>
+        <input type="range" id="speedSlider" min="1" max="100" value="35" style="cursor: pointer; width: 180px;">
+    </div>
+
+    <div style="margin-top: 10px; display: flex; gap: 10px; font-size: 11px; width: 100%; justify-content: center;">
+        <div style="background: #27272a; padding: 6px 10px; border-radius: 6px; border: 1px solid #3f3f46; text-align: center;">Samples: <span id="totalSamples" style="font-weight: bold; color: #a5b4fc;">0</span></div>
+        <div style="background: #27272a; padding: 6px 10px; border-radius: 6px; border: 1px solid #3f3f46; text-align: center;">Accept Rate: <span id="accRate" style="font-weight: bold; color: #a5b4fc;">0.0%</span></div>
+    </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('mcmcCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // Layout geometry config
+  const PAD_LEFT = 50;
+  const PAD_TOP = 100;
+  const MAIN_SIZE = 320; 
+  const MARGIN_PANEL_SIZE = 90; 
+
+  // Geometry config for chains
+  const CHAIN_X_START = 490;
+  const CHAIN_WIDTH = 230;
+  const CHAIN_HEIGHT = 100;
+  const CHAIN_Y1_START = 105; // X parameter chain (mu)
+  const CHAIN_Y2_START = 265; // Y parameter chain (beta)
+
+  // Simulation settings
+  let currentX = 0.0;
+  let currentY = 0.0;
+  const proposalSigma = 0.4;
+
+  let samples = [];
+  let totalAttempts = 0;
+  let totalAccepts = 0;
+  let frameCounter = 0;
+
+  const numBins = 50;
+  const binsX = new Array(numBins).fill(0);
+  const binsY = new Array(numBins).fill(0);
+
+  let proposedX = null;
+  let proposedY = null;
+  let proposalAccepted = false;
+
+  const speedSlider = document.getElementById('speedSlider');
+  const totalSamplesEl = document.getElementById('totalSamples');
+  const accRateEl = document.getElementById('accRate');
+
+  function toCanvasX(x) { return PAD_LEFT + (x + 3) * (MAIN_SIZE / 6); }
+  function toCanvasY(y) { return PAD_TOP + (3 - y) * (MAIN_SIZE / 6); }
+
+  function targetPDF(x, y) {
+      const q = x * x - 1.2 * x * y + y * y;
+      return Math.exp(-0.5 * q);
+  }
+
+  // Pre-render background space with Heatmap + Contour Lines
+  const bgCanvas = document.createElement('canvas');
+  bgCanvas.width = MAIN_SIZE;
+  bgCanvas.height = MAIN_SIZE;
+  const bgCtx = bgCanvas.getContext('2d');
+
+  function preRenderBackground() {
+      // 1. Draw smooth underlying density gradient
+      const imgData = bgCtx.createImageData(MAIN_SIZE, MAIN_SIZE);
+      for (let cx = 0; cx < MAIN_SIZE; cx++) {
+          for (let cy = 0; cy < MAIN_SIZE; cy++) {
+              const x = (cx / MAIN_SIZE) * 6 - 3;
+              const y = 3 - (cy / MAIN_SIZE) * 6;
+              const prob = targetPDF(x, y);
+              const index = (cx + cy * MAIN_SIZE) * 4;
+              
+              imgData.data[index] = 31;                         // R (Nebrija Navy base)
+              imgData.data[index + 1] = 73;                     // G
+              imgData.data[index + 2] = 125 * prob + 30;        // B
+              imgData.data[index + 3] = 255 * prob * 0.35;      // Subtle background alpha
+          }
+      }
+      bgCtx.putImageData(imgData, 0, 0);
+
+      // 2. Overlay analytical Contour Rings
+      const contourLevels = [0.1, 0.3, 0.5, 0.7, 0.9];
+      const scale = MAIN_SIZE / 6; // pixels per mathematical unit
+      const centerX = MAIN_SIZE / 2;
+      const centerY = MAIN_SIZE / 2;
+
+      bgCtx.lineWidth = 1.5;
+      
+      contourLevels.forEach(level => {
+          const c = -2 * Math.log(level);
+          const radiusX = Math.sqrt(c / 0.4) * scale; // Major axis length
+          const radiusY = Math.sqrt(c / 1.6) * scale; // Minor axis length
+          
+          bgCtx.beginPath();
+          bgCtx.ellipse(centerX, centerY, radiusX, radiusY, -Math.PI / 4, 0, 2 * Math.PI);
+          bgCtx.strokeStyle = `rgba(129, 140, 248, ${0.2 + level * 0.5})`;
+          bgCtx.stroke();
+      });
+  }
+  preRenderBackground();
+
+  function randomNormal() {
+      let u = 0, v = 0;
+      while(u === 0) u = Math.random(); 
+      while(v === 0) v = Math.random();
+      return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  }
+
+  function stepMCMC() {
+      proposedX = currentX + randomNormal() * proposalSigma;
+      proposedY = currentY + randomNormal() * proposalSigma;
+      
+      const pCurrent = targetPDF(currentX, currentY);
+      const pProposed = targetPDF(proposedX, proposedY);
+      const acceptanceRatio = pProposed / pCurrent;
+      
+      totalAttempts++;
+      
+      if (Math.random() < acceptanceRatio) {
+          currentX = proposedX;
+          currentY = proposedY;
+          totalAccepts++;
+          proposalAccepted = true;
+      } else {
+          proposalAccepted = false;
+      }
+      
+      samples.push({x: currentX, y: currentY});
+
+      let idxX = Math.floor((currentX + 3) / 6 * numBins);
+      if (idxX >= 0 && idxX < numBins) binsX[idxX]++;
+      
+      let idxY = Math.floor((currentY + 3) / 6 * numBins);
+      if (idxY >= 0 && idxY < numBins) binsY[idxY]++;
+  }
+
+  function drawChains() {
+      const historyLen = 150;
+      const startIdx = Math.max(0, samples.length - historyLen);
+      const visibleSamples = samples.slice(startIdx);
+      
+      // Draw Chain X (Top - mu)
+      ctx.strokeStyle = '#3f3f46';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(CHAIN_X_START, CHAIN_Y1_START, CHAIN_WIDTH, CHAIN_HEIGHT);
+      
+      // Zero line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(CHAIN_X_START, CHAIN_Y1_START + CHAIN_HEIGHT / 2);
+      ctx.lineTo(CHAIN_X_START + CHAIN_WIDTH, CHAIN_Y1_START + CHAIN_HEIGHT / 2);
+      ctx.stroke();
+      
+      // Label
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '11px monospace';
+      ctx.fillText('Trace X', CHAIN_X_START, CHAIN_Y1_START - 8);
+      
+      if (visibleSamples.length > 0) {
+          ctx.strokeStyle = '#818cf8'; // Indigo
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          for (let i = 0; i < visibleSamples.length; i++) {
+              const cx = CHAIN_X_START + (i / (historyLen - 1)) * CHAIN_WIDTH;
+              const cy = CHAIN_Y1_START + CHAIN_HEIGHT / 2 - (visibleSamples[i].x * (CHAIN_HEIGHT / 6));
+              if (i === 0) ctx.moveTo(cx, cy);
+              else ctx.lineTo(cx, cy);
+          }
+          ctx.stroke();
+      }
+
+      // Draw Chain Y (Bottom - beta)
+      ctx.strokeStyle = '#3f3f46';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(CHAIN_X_START, CHAIN_Y2_START, CHAIN_WIDTH, CHAIN_HEIGHT);
+      
+      // Zero line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(CHAIN_X_START, CHAIN_Y2_START + CHAIN_HEIGHT / 2);
+      ctx.lineTo(CHAIN_X_START + CHAIN_WIDTH, CHAIN_Y2_START + CHAIN_HEIGHT / 2);
+      ctx.stroke();
+      
+      // Label
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '11px monospace';
+      ctx.fillText('Trace Y', CHAIN_X_START, CHAIN_Y2_START - 8);
+      
+      if (visibleSamples.length > 0) {
+          ctx.strokeStyle = '#f472b6'; // Pink
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          for (let i = 0; i < visibleSamples.length; i++) {
+              const cx = CHAIN_X_START + (i / (historyLen - 1)) * CHAIN_WIDTH;
+              const cy = CHAIN_Y2_START + CHAIN_HEIGHT / 2 - (visibleSamples[i].y * (CHAIN_HEIGHT / 6));
+              if (i === 0) ctx.moveTo(cx, cy);
+              else ctx.lineTo(cx, cy);
+          }
+          ctx.stroke();
+      }
+  }
+
+  function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      ctx.drawImage(bgCanvas, PAD_LEFT, PAD_TOP);
+      
+      ctx.strokeStyle = '#3f3f46';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(PAD_LEFT, PAD_TOP, MAIN_SIZE, MAIN_SIZE);
+      
+      ctx.fillStyle = 'rgba(165, 180, 252, 0.22)'; 
+      for(let i = 0; i < samples.length; i++) {
+          ctx.fillRect(toCanvasX(samples[i].x), toCanvasY(samples[i].y), 1.5, 1.5);
+      }
+      
+      if (proposedX !== null) {
+          ctx.beginPath();
+          const prevX = proposalAccepted ? samples[samples.length-2]?.x || currentX : currentX;
+          const prevY = proposalAccepted ? samples[samples.length-2]?.y || currentY : currentY;
+          
+          ctx.moveTo(toCanvasX(prevX), toCanvasY(prevY));
+          ctx.lineTo(toCanvasX(proposedX), toCanvasY(proposedY));
+          ctx.lineWidth = 1.8;
+          ctx.strokeStyle = proposalAccepted ? '#10b981' : '#ef4444';
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.arc(toCanvasX(proposedX), toCanvasY(proposedY), 3.5, 0, 2 * Math.PI);
+          ctx.fillStyle = proposalAccepted ? '#10b981' : '#ef4444';
+          ctx.fill();
+      }
+      
+      ctx.beginPath();
+      ctx.arc(toCanvasX(currentX), toCanvasY(currentY), 5.5, 0, 2 * Math.PI);
+      ctx.fillStyle = '#6366f1';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2;
+      ctx.fill();
+      ctx.stroke();
+      
+      // X Histograms (Top Panel)
+      const maxBinX = Math.max(...binsX, 1);
+      const binW = MAIN_SIZE / numBins;
+      ctx.fillStyle = 'rgba(99, 102, 241, 0.35)';
+      for (let i = 0; i < numBins; i++) {
+          const cx = PAD_LEFT + i * binW;
+          const barHeight = (binsX[i] / maxBinX) * (MARGIN_PANEL_SIZE - 10);
+          const cy = (PAD_TOP - 15) - barHeight;
+          ctx.fillRect(cx, cy, binW - 1, barHeight);
+      }
+      
+      // X Analytical Curve
+      ctx.beginPath();
+      for (let i = 0; i <= MAIN_SIZE; i++) {
+          const cx = PAD_LEFT + i;
+          const x = (i / MAIN_SIZE) * 6 - 3;
+          const density = Math.exp(-0.32 * x * x);
+          const cy = (PAD_TOP - 15) - density * (MARGIN_PANEL_SIZE - 10);
+          if (i === 0) ctx.moveTo(cx, cy);
+          else ctx.lineTo(cx, cy);
+      }
+      ctx.strokeStyle = '#6366f1';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Y Histograms (Right Panel)
+      const maxBinY = Math.max(...binsY, 1);
+      const binH = MAIN_SIZE / numBins;
+      ctx.fillStyle = 'rgba(99, 102, 241, 0.35)';
+      for (let i = 0; i < numBins; i++) {
+          const cy = PAD_TOP + MAIN_SIZE - (i + 1) * binH;
+          const barWidth = (binsY[i] / maxBinY) * (MARGIN_PANEL_SIZE - 10);
+          const cx = PAD_LEFT + MAIN_SIZE + 15;
+          ctx.fillRect(cx, cy, barWidth, binH - 1);
+      }
+      
+      // Y Analytical Curve
+      ctx.beginPath();
+      for (let i = 0; i <= MAIN_SIZE; i++) {
+          const cy = PAD_TOP + i;
+          const y = 3 - (i / MAIN_SIZE) * 6;
+          const density = Math.exp(-0.32 * y * y);
+          const cx = (PAD_LEFT + MAIN_SIZE + 15) + density * (MARGIN_PANEL_SIZE - 10);
+          if (i === 0) ctx.moveTo(cx, cy);
+          else ctx.lineTo(cx, cy);
+      }
+      ctx.strokeStyle = '#6366f1';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Draw scrolling MCMC parameter chains
+      drawChains();
+      
+      totalSamplesEl.textContent = samples.length;
+      const rate = totalAttempts > 0 ? ((totalAccepts / totalAttempts) * 100).toFixed(1) : 0;
+      accRateEl.textContent = `${rate}%`;
+  }
+
+  let animationId = null;
+  function animationLoop() {
+      frameCounter++;
+      const val = speedSlider ? parseInt(speedSlider.value) : 35;
+      
+      if (val <= 40) {
+          const framesPerStep = 41 - val;
+          if (frameCounter % framesPerStep === 0) {
+              stepMCMC();
+          }
+      } else {
+          const stepsPerFrame = Math.round((val - 40) * 1.25) + 1;
+          for(let i = 0; i < stepsPerFrame; i++) {
+              stepMCMC();
+          }
+      }
+      draw();
+      animationId = requestAnimationFrame(animationLoop);
+  }
+
+  animationLoop();
+  
+  canvas.addEventListener('remove', function() {
+      if (animationId) cancelAnimationFrame(animationId);
+  });
+})();
+</script>
+```
+
+## Modern MCMC algorithms 
+
+- Modern MCMC algorithms, such as Hamiltonian Monte Carlo (HMC) and its variant No-U-Turn Sampler (NUTS), are more efficient than the basic Metropolis-Hastings algorithm. They can explore the parameter space more effectively and converge faster.
+
 
 ## The Bayesian Solution
 
@@ -68,18 +467,207 @@ Bayesian inference combines our **Priors** (prior beliefs about parameter scales
 * **Weakly Informative/Regularizing Priors:** Restrict parameters to physically/physiologically plausible bounds (e.g., response times cannot be negative or 10 seconds).
 * **Shrinkage:** Pulls extreme, noisy random effect estimates towards the group mean, preventing overfitting.
 
+## Analogy in `brms`: The Gaussian Bayesian LMM
+
+To transition from Frequentist LMMs (`lme4`) to Bayesian LMMs (`brms`), we can fit an identical formula structure using a Gaussian family. 
+
+```{r}
+#| eval: false
+#| echo: true
+library(brms)
+library(here)
+
+# Formula matches the lme4 model from Session 1
+fit_gaussian <- brm(
+  formula = rt ~ Condition * StimulusType + 
+    (Condition * StimulusType | subject) + 
+    (Condition | item),
+  data = flanker_sub,
+  family = gaussian(),
+  prior = priors_gaussian,
+  chains = 4, iter = 2000, warmup = 1000,
+  cores = 4, backend = "cmdstanr"
+)
+```
+
+::: {.accent-box}
+Unlike `lme4`, `brms` will compute the full joint posterior distribution using MCMC (Hamiltonian Monte Carlo / NUTS) instead of estimating a single point (Maximum Likelihood).
+:::
+
+## Specifying Regularizing Priors
+
+Before running the model, we define regularizing priors to restrict parameters to physiologically plausible bounds and prevent singular fits:
+
+```{r}
+#| eval: false
+#| echo: true
+priors_gaussian <- c(
+  prior(normal(0.6, 0.2), class = "Intercept"), # intercept centered at 600ms
+  prior(normal(0, 0.1), class = "b"),           # regularize fixed effects
+  prior(exponential(2), class = "sd"),          # group-level SD variation
+  prior(lkj(2), class = "cor")                  # correlation matrix prior
+)
+```
+
+* **Intercept Prior:** Center prior knowledge around an average correct RT of 600 ms ($\pm 400$ ms bounds).
+* **LKJ Prior ($2$):** Pulls the correlation between random intercepts and slopes toward zero, avoiding the degenerate $\pm 1$ singular fits common in `lme4`.
+
+## Model Output: Summary
+
+```{r}
+#| label: load-gaussian-model
+#| echo: false
+#| eval: true
+#| message: false
+#| warning: false
+library(qs2)
+library(here)
+library(brms)
+
+# Load the pre-fit model using the here package
+fit_gaussian <- qs_read(here("presentations", "fit_gaussian.qs2"))
+```
+
+```{r}
+summary(fit_gaussian)
+```
+
+## Interpretation of the Gaussian LMM Output
+
+::: {style="font-size: 65%;"}
+```{r}
+#| label: interpret-gaussian-output
+#| echo: false
+#| eval: true
+
+fixed_effects <- summary(fit_gaussian)$fixed[, c("Estimate", "Est.Error", "l-95% CI", "u-95% CI")]
+knitr::kable(round(fixed_effects, 3), format = "markdown")
+```
+
+:::
+
+* The **Intercept** (baseline RT) is estimated at `r round(summary(fit_gaussian)$fixed["Intercept", "Estimate"], 2)`s (approx. 490 ms).
+* Results are largely the same as the `lme4` model, but now we have **credible intervals** instead of confidence intervals. 
+
+
+## Interpreting MCMC Diagnostics
+
+A critical step in Bayesian workflow is verifying that the chains have successfully converged and explored the target distribution.
+
+::: {style="font-size: 65%;"}
+```{r}
+#| label: print-gaussian-diagnostics
+#| echo: false
+#| eval: true
+#| message: false
+#| warning: false
+# Extract convergence diagnostics for population-level parameters
+diagnostics <- summary(fit_gaussian)$fixed[, c("Rhat", "Bulk_ESS", "Tail_ESS")]
+knitr::kable(round(diagnostics, 2), format = "markdown")
+```
+:::
+
+* **$\hat{R}$ (Potential Scale Reduction Factor):** Measures variance between vs. within chains. At convergence, $\hat{R} \le 1.01$. Here, all $\hat{R}$ are exactly $1.00$ or $1.01$.
+* **ESS (Effective Sample Size):** Number of independent draws. Both **Bulk ESS** (for mean/medians) and **Tail ESS** (for credible intervals) should be $> 400$ (ideally $> 1000$).
+
+## Posterior Predictive Check (PPC)
+
+To evaluate how well our model's Gaussian assumption matches the actual response time distribution, we can perform a **Posterior Predictive Check**:
+
+```{r}
+#| label: ppc-gaussian-model
+#| echo: true
+#| eval: true
+#| fig-align: "center"
+#| out-width: "70%"
+#| message: false
+#| warning: false
+library(bayesplot)
+library(ggplot2)
+color_scheme_set("red")
+pp_check(fit_gaussian, ndraws = 50) +
+  theme_minimal(base_family = "sans") +
+  labs(
+    title = "Posterior Predictive Check (Gaussian brms LMM)",
+    x = "Reaction Time (s)",
+    y = "Density"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", color = "#1F497D", size = 14),
+    legend.position = "bottom"
+  )
+```
+::: {.accent-box}
+### ⚠️ Mismatch in the Tail
+Notice that because reaction times are right-skewed, the Gaussian model's replicates (thin lines) fail to capture the long right-tail of the raw data, and instead fits a much wider Gaussian component. We should try the **ex-Gaussian**!
+:::
+
 ## Section 2: Modeling RTs with the ex-Gaussian Distribution {.dark-bg background-color="#1F497D"}
 
 ## What is the ex-Gaussian Distribution?
 
-Human reaction times are rarely symmetrical. They are heavily right-skewed. The **ex-Gaussian** distribution represents this shape by combining:
+Human reaction times are rarely symmetrical. They are heavily right-skewed. The **ex-Gaussian** distribution represents this shape by combining a Gaussian (normal) component and an exponential component:
 
-1. A **Gaussian (normal) distribution** representing the cognitive core ($\mu$ and $\sigma$).
-2. An **exponential distribution** representing the right-tail skew ($\beta$).
+$$\text{RT} \sim \text{Normal}(\text{Gaussian}) + \text{Exponential}$$
 
-$$\text{RT} \sim \text{Normal}(\mu, \sigma) + \text{Exponential}(\beta)$$
+The distribution is characterized by three parameters:
+* **$\xi$ (Gaussian Mean):** Center of the normal component (reflects core decision onset and baseline foveal/cognitive latency).
+* **$\sigma$ (Gaussian SD):** Standard deviation of the normal component (reflects foveal processing variance).
+* **$\beta$ (or $\tau$, Exponential Scale):** Scale/mean of the exponential component (reflects the slow decision tail, often linked to lapses of attention or threshold leakage).
 
-Rather than log-transforming response times, we can model raw `rt` directly and test how our conditions affect both the **core latency** ($\mu$) and the **decision tail** ($\beta$).
+$$\text{Overall Mean } (M) = \xi + \beta$$
+
+## Systematic Effects of $\xi$ and $\beta$
+
+To understand how the Gaussian center ($\xi$) and the exponential tail ($\beta$) independently shape the density curve, we can systematically vary them across a grid:
+
+![](images/exg_grid.png){fig-align="center" width="100%"}
+
+## Standard vs. `brms` Parameterization
+
+Most traditional psychometric packages parameterize the ex-Gaussian using $(\xi, \sigma, \beta)$ to represent the independent Gaussian and exponential components.
+
+However, `brms` implements a highly practical reparameterization:
+
+* **In `brms`:** You model **$\mu$ (the overall mean of the entire distribution)** and **$\beta$ (the scale of the exponential component)** directly.
+* **Implicit Calculation:** The central Gaussian mean ($\xi$) is calculated implicitly behind the scenes as:
+
+$$\xi = \mu - \beta$$
+
+* **Why does `brms` do this?**
+  - **Direct Average RT:** Main effect coefficients for `mu` tell you directly how your predictors change the *actual average reaction time* of your subjects.
+  - **MCMC Stability:** Reduces collinearity between parameters, leading to highly stable Markov Chain Monte Carlo (MCMC) sampling.
+
+## Visualizing ex-Gaussian Shifts: Varying `mu` (beta Constant)
+
+When **only `mu` varies** in `brms` (while the exponential tail scale `beta` remains constant):
+
+![](images/exg_mu_varying.png){fig-align="center" width="75%"}
+
+Since $\beta$ is constant and $\mu$ increases, the Gaussian center also increases ($\xi = \mu - \beta$). The entire distribution shifts laterally; the shape and right-tail skew remain identical.
+
+## Interpreting Coefficients & Post-Processing
+
+This reparameterization has major implications for how you interpret your statistical outputs:
+
+::: {.accent-box}
+### ⚠️ The Interpretation Catch
+If your experimental condition only increases the exponential tail ($\beta$) while the core Gaussian component ($\xi$) remains completely unchanged, `brms` will show a positive coefficient for **both** `mu` and `beta` because:
+$$\mu = \xi + \beta$$
+:::
+
+* **How to isolate the Gaussian core $\xi$:**
+  If you want to know how your predictors affect the pure central Gaussian component, you must perform post-processing on the posterior draws:
+  
+  $$\xi_{\text{draws}} = \mu_{\text{draws}} - \beta_{\text{draws}}$$
+
+## Visualizing the `brms` Catch: Constant `xi`, Varying `beta`
+
+When the core Gaussian component **`xi` remains completely constant**, but the **tail skew `beta` increases**:
+
+![](images/exg_mu_beta_varying.png){fig-align="center" width="75%"}
+
+The peak/onset remains at the exact same location, but the right tail becomes fatter. In `brms`, because $\mu = \xi + \beta$, the overall mean $\mu$ increases, resulting in positive coefficients for **both** `mu` and `beta`!
 
 ## Bayesian RT: Priors & ex-Gaussian setup
 
