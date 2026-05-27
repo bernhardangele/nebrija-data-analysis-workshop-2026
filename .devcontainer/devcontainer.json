@@ -4,7 +4,7 @@
   "forwardPorts": [8787],
   "containerEnv": {
     "PASSWORD": "${localEnv:RSTUDIO_PASSWORD}",
-    "CMDSTAN": "/opt/cmdstan/cmdstan-2.37.0"
+    "CMDSTAN": "/opt/cmdstan/cmdstan-2.38.0"
   },
   "customizations": {
     "vscode": {

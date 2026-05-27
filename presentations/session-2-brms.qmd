@@ -25,12 +25,12 @@ Here is the plan for this workshop:
   - **Part 3:** Linear mixed-effects modeling of response times (Gaussian) using `lme4`
 
 - **Session 2 (today)**
-  - **Part 1** The Bayesian multilevel framework, priors, and response families
+  - **Part 1** Introduction to Bayesian models
   - **Part 2:** Modeling response times with the Gaussian distribution in `brms`
   - **Part 3:** Using the ex-Gaussian distribution in `brms`
-  - **Part 4:** Model diagnostics, posterior predictive checks, interpretation
+  - **Part 4:** Predicting multiple parameters
 
-## Section 1: The Bayesian Multilevel Framework {.dark-bg background-color="#1F497D"}
+## Part 1: Introduction to Bayesian models {.dark-bg background-color="#C2002F"}
 
 ## Why Bayesian Multilevel Models?
 
@@ -467,7 +467,9 @@ Bayesian inference combines our **Priors** (prior beliefs about parameter scales
 * **Weakly Informative/Regularizing Priors:** Restrict parameters to physically/physiologically plausible bounds (e.g., response times cannot be negative or 10 seconds).
 * **Shrinkage:** Pulls extreme, noisy random effect estimates towards the group mean, preventing overfitting.
 
-## Analogy in `brms`: The Gaussian Bayesian LMM
+## Modeling response times with the Gaussian distribution in `brms` {.dark-bg background-color="#C2002F"}
+
+## Fit the model with `brms`
 
 To transition from Frequentist LMMs (`lme4`) to Bayesian LMMs (`brms`), we can fit an identical formula structure using a Gaussian family. 
 
@@ -477,7 +479,7 @@ To transition from Frequentist LMMs (`lme4`) to Bayesian LMMs (`brms`), we can f
 library(brms)
 library(here)
 
-# Formula matches the lme4 model from Session 1
+# Same formula and contrasts as lme4 model
 fit_gaussian <- brm(
   formula = rt ~ Condition * StimulusType + 
     (Condition * StimulusType | subject) + 
@@ -486,13 +488,22 @@ fit_gaussian <- brm(
   family = gaussian(),
   prior = priors_gaussian,
   chains = 4, iter = 2000, warmup = 1000,
-  cores = 4, backend = "cmdstanr"
+  cores = 4, backend = "cmdstanr",
+  # if you have enough processor cores, you can speed up the model by using 2 or more cores per chain
+  # this has diminishing returns -- 2 cores won't be twice as fast as one
+  threads = threading(2)
 )
 ```
 
 ::: {.accent-box}
 Unlike `lme4`, `brms` will compute the full joint posterior distribution using MCMC (Hamiltonian Monte Carlo / NUTS) instead of estimating a single point (Maximum Likelihood).
 :::
+
+## What do we need to fit a model with brms?
+
+- **Model Formula:** Same as `lme4`, but we can also specify more complex structures.
+- **Data:** Same as `lme4`. A data frame with all the variables used in the formula.
+- **Priors:** We need to specify prior distributions for all our parameters. This is necessary in Bayesian statistics. `brms` has default priors that it uses if no prior is specified. 
 
 ## Specifying Regularizing Priors
 
@@ -502,8 +513,9 @@ Before running the model, we define regularizing priors to restrict parameters t
 #| eval: false
 #| echo: true
 priors_gaussian <- c(
-  prior(normal(0.6, 0.2), class = "Intercept"), # intercept centered at 600ms
-  prior(normal(0, 0.1), class = "b"),           # regularize fixed effects
+  # you should set a prior for fixed effects
+  prior(normal(0, 0.1), class = "b"),          
+  # these are optional, the brms priors usually work well
   prior(exponential(2), class = "sd"),          # group-level SD variation
   prior(lkj(2), class = "cor")                  # correlation matrix prior
 )
@@ -524,7 +536,7 @@ library(qs2)
 library(here)
 library(brms)
 
-# Load the pre-fit model using the here package
+# Load the pre-fit model (here package deals with path)
 fit_gaussian <- qs_read(here("presentations", "fit_gaussian.qs2"))
 ```
 
@@ -598,11 +610,10 @@ pp_check(fit_gaussian, ndraws = 50) +
   )
 ```
 ::: {.accent-box}
-### ⚠️ Mismatch in the Tail
-Notice that because reaction times are right-skewed, the Gaussian model's replicates (thin lines) fail to capture the long right-tail of the raw data, and instead fits a much wider Gaussian component. We should try the **ex-Gaussian**!
+Notice that because reaction times are right-skewed, the Gaussian model's replicates (thin lines) fail to capture the long right-tail of the raw data, and instead fits a much wider Gaussian distribution. We should try the **ex-Gaussian**.
 :::
 
-## Section 2: Modeling RTs with the ex-Gaussian Distribution {.dark-bg background-color="#1F497D"}
+## Part 3: Modeling RTs with the ex-Gaussian Distribution {.dark-bg background-color="#C2002F"}
 
 ## What is the ex-Gaussian Distribution?
 
@@ -625,20 +636,17 @@ To understand how the Gaussian center ($\xi$) and the exponential tail ($\beta$)
 
 ## Standard vs. `brms` Parameterization
 
-Most traditional psychometric packages parameterize the ex-Gaussian using $(\xi, \sigma, \beta)$ to represent the independent Gaussian and exponential components.
+In most descriptions of the ex-Gaussian distribution, it is parameterized using $(\xi, \sigma, \beta)$ to represent the independent Gaussian and exponential components.
 
-However, `brms` implements a highly practical reparameterization:
+However, `brms` does it differently:
 
 * **In `brms`:** You model **$\mu$ (the overall mean of the entire distribution)** and **$\beta$ (the scale of the exponential component)** directly.
-* **Implicit Calculation:** The central Gaussian mean ($\xi$) is calculated implicitly behind the scenes as:
+* The central Gaussian mean ($\xi$) is calculated implicitly behind the scenes as:
 
 $$\xi = \mu - \beta$$
 
-* **Why does `brms` do this?**
-  - **Direct Average RT:** Main effect coefficients for `mu` tell you directly how your predictors change the *actual average reaction time* of your subjects.
-  - **MCMC Stability:** Reduces collinearity between parameters, leading to highly stable Markov Chain Monte Carlo (MCMC) sampling.
 
-## Visualizing ex-Gaussian Shifts: Varying `mu` (beta Constant)
+## How to interpret this
 
 When **only `mu` varies** in `brms` (while the exponential tail scale `beta` remains constant):
 
@@ -646,28 +654,8 @@ When **only `mu` varies** in `brms` (while the exponential tail scale `beta` rem
 
 Since $\beta$ is constant and $\mu$ increases, the Gaussian center also increases ($\xi = \mu - \beta$). The entire distribution shifts laterally; the shape and right-tail skew remain identical.
 
-## Interpreting Coefficients & Post-Processing
+- By default, `brms` will assume that $\beta$ and $\sigma$ are the same for every observation and only $\mu$ is influenced by fixed and random effects.
 
-This reparameterization has major implications for how you interpret your statistical outputs:
-
-::: {.accent-box}
-### ⚠️ The Interpretation Catch
-If your experimental condition only increases the exponential tail ($\beta$) while the core Gaussian component ($\xi$) remains completely unchanged, `brms` will show a positive coefficient for **both** `mu` and `beta` because:
-$$\mu = \xi + \beta$$
-:::
-
-* **How to isolate the Gaussian core $\xi$:**
-  If you want to know how your predictors affect the pure central Gaussian component, you must perform post-processing on the posterior draws:
-  
-  $$\xi_{\text{draws}} = \mu_{\text{draws}} - \beta_{\text{draws}}$$
-
-## Visualizing the `brms` Catch: Constant `xi`, Varying `beta`
-
-When the core Gaussian component **`xi` remains completely constant**, but the **tail skew `beta` increases**:
-
-![](images/exg_mu_beta_varying.png){fig-align="center" width="75%"}
-
-The peak/onset remains at the exact same location, but the right tail becomes fatter. In `brms`, because $\mu = \xi + \beta$, the overall mean $\mu$ increases, resulting in positive coefficients for **both** `mu` and `beta`!
 
 ## Bayesian RT: Priors & ex-Gaussian setup
 
@@ -680,13 +668,11 @@ library(tidyverse)
 
 # Define regularizing priors on the log/raw scale
 priors_exg <- c(
-  prior(normal(0.6, 0.2), class = "Intercept"),       # RT intercept (600ms)
   prior(normal(0, 0.1), class = "b"),                 # Fixed effects on RT
   prior(exponential(2), class = "sd"),                # Subject/Item variation
   prior(lkj(2), class = "cor"),                       # Random correlation matrix
   
   # Priors for the exponential parameter beta
-  prior(normal(-1.5, 0.5), class = "Intercept", dpar = "beta"), 
   prior(normal(0, 0.3), class = "b", dpar = "beta")
 )
 ```
@@ -705,10 +691,178 @@ blmm_rt <- brm(
   family = exgaussian(),
   prior = priors_exg,
   chains = 4, iter = 4000, warmup = 2000,
-  control = list(adapt_delta = 0.95),
+  # if you get divergent transitions, try adapt_delta = 0.95 
+  control = list(adapt_delta = 0.8),
   cores = 4, backend = "cmdstanr"
 )
 ```
+
+## Model Output: ex-Gaussian (mu-only)
+
+::: {style="font-size: 55%;"}
+```{r}
+#| label: load-exg-mu-model
+#| echo: false
+#| eval: true
+#| message: false
+#| warning: false
+library(qs2)
+library(here)
+library(brms)
+
+mu_file <- here("presentations", "fit_exgaussian_mu.qs2")
+if (file.exists(mu_file)) {
+  fit_exg_mu <- qs_read(mu_file)
+  fixed_effects_exg_mu <- summary(fit_exg_mu)$fixed
+  knitr::kable(round(fixed_effects_exg_mu, 3), format = "markdown")
+} else {
+  cat("**[Note: Please run 'Rscript presentations/fit_gaussian_brms.R' to generate this table]**")
+}
+```
+:::
+
+::: {.accent-box}
+* **$\beta$ (Exponential Scale)** is estimated globally on the raw scale: 
+`r if (file.exists(here("presentations", "fit_exgaussian_mu.qs2"))) {
+  fit_exg_mu <- qs_read(here("presentations", "fit_exgaussian_mu.qs2"))
+  paste0(round(summary(fit_exg_mu)$spec_pars["beta", "Estimate"], 3), "s (approx. ", round(summary(fit_exg_mu)$spec_pars["beta", "Estimate"] * 1000), " ms of exponential tail latency)")
+} else {
+  "TBD (run model fitting script first)"
+}`
+:::
+
+## PPC: ex-Gaussian (mu-only) Model
+
+To evaluate the fit of the ex-Gaussian model with fixed/random effects restricted to the mean $\mu$:
+
+```{r}
+#| label: ppc-exg-mu-model
+#| echo: false
+#| eval: true
+#| fig-align: "center"
+#| out-width: "70%"
+#| message: false
+#| warning: false
+library(bayesplot)
+library(ggplot2)
+mu_file <- here("presentations", "fit_exgaussian_mu.qs2")
+if (file.exists(mu_file)) {
+  fit_exg_mu <- qs_read(mu_file)
+  color_scheme_set("red")
+  p <- pp_check(fit_exg_mu, ndraws = 50) +
+    theme_minimal(base_family = "sans") +
+    labs(
+      title = "Posterior Predictive Check (ex-Gaussian - mu only)",
+      x = "Reaction Time (s)",
+      y = "Density"
+    ) +
+    theme(
+      plot.title = element_text(face = "bold", color = "#1F497D", size = 14),
+      legend.position = "bottom"
+    )
+  print(p)
+} else {
+  ggplot() + 
+    annotate("text", x = 0.5, y = 0.5, label = "Please run the model fitting script\n(presentations/fit_gaussian_brms.R)\nto view the PPC plot.", size = 5, color = "#C2002F") + 
+    theme_void()
+}
+```
+
+::: {.accent-box}
+Notice how much better the ex-Gaussian family captures the raw data's right-skewed tail compared to the standard Gaussian model!
+:::
+
+## Part 4: Predicting multiple parameters {.dark-bg background-color="#C2002F"}
+
+## Extending the model: allowing effects on $\beta$
+
+- In `brms`, you can specify a regression equation for every distribution parameter!
+- Because of the parameterization used in `brms`, be careful how you interpret the results:
+
+::: {.accent-box}
+If your experimental condition only increases the exponential tail ($\beta$) while the core Gaussian component ($\xi$) remains completely unchanged, `brms` will show a positive coefficient for **both** `mu` and `beta` because:
+$$\mu = \xi + \beta$$
+:::
+
+## Varying beta
+
+When the core Gaussian component **`xi` remains completely constant**, but the **tail skew `beta` increases**:
+
+![](images/exg_mu_beta_varying.png){fig-align="center" width="75%"}
+
+The peak/onset remains at the exact same location, but the right tail becomes fatter. In `brms`, because $\mu = \xi + \beta$, the overall mean $\mu$ increases, resulting in positive coefficients for **both** `mu` and `beta`!
+
+
+## Model Output: ex-Gaussian (mu & beta)
+
+Here are the coefficients for both $\mu$ (mean) and $\beta$ (exponential tail scale) from the full model:
+
+::: {style="font-size: 50%;"}
+```{r}
+#| label: load-exg-mu-beta-model
+#| echo: false
+#| eval: true
+#| message: false
+#| warning: false
+library(qs2)
+library(here)
+library(brms)
+
+mu_beta_file <- here("presentations", "fit_exgaussian_mu_beta.qs2")
+if (file.exists(mu_beta_file)) {
+  fit_exg_mu_beta <- qs_read(mu_beta_file)
+  fixed_effects_exg_mu_beta <- summary(fit_exg_mu_beta)$fixed
+  knitr::kable(round(fixed_effects_exg_mu_beta, 3), format = "markdown")
+} else {
+  cat("**[Note: Please run 'Rscript presentations/fit_gaussian_brms.R' to generate this table]**")
+}
+```
+:::
+
+::: {.accent-box}
+* Predicting both $\mu$ and $\beta$ reveals whether experimental factors independently influence baseline cognitive latency ($\mu$) vs. processing lapses/decision threshold leakage ($\beta$).
+:::
+
+## PPC: ex-Gaussian (mu & beta) Model
+
+To evaluate the full predictive accuracy of the ex-Gaussian model predicting both $\mu$ and $\beta$:
+
+```{r}
+#| label: ppc-exg-mu-beta-model
+#| echo: false
+#| eval: true
+#| fig-align: "center"
+#| out-width: "70%"
+#| message: false
+#| warning: false
+library(bayesplot)
+library(ggplot2)
+mu_beta_file <- here("presentations", "fit_exgaussian_mu_beta.qs2")
+if (file.exists(mu_beta_file)) {
+  fit_exg_mu_beta <- qs_read(mu_beta_file)
+  color_scheme_set("red")
+  p <- pp_check(fit_exg_mu_beta, ndraws = 50) +
+    theme_minimal(base_family = "sans") +
+    labs(
+      title = "Posterior Predictive Check (ex-Gaussian - mu & beta)",
+      x = "Reaction Time (s)",
+      y = "Density"
+    ) +
+    theme(
+      plot.title = element_text(face = "bold", color = "#1F497D", size = 14),
+      legend.position = "bottom"
+    )
+  print(p)
+} else {
+  ggplot() + 
+    annotate("text", x = 0.5, y = 0.5, label = "Please run the model fitting script\n(presentations/fit_gaussian_brms.R)\nto view the PPC plot.", size = 5, color = "#C2002F") + 
+    theme_void()
+}
+```
+
+::: {.accent-box}
+The overall fit is very similar to when we assume a single value of $\beta$ for all observations, but now we can see if beta varies between any of the conditions.
+:::
 
 ## Section 3: Modeling Accuracy (Bernoulli) {.dark-bg background-color="#1F497D"}
 
