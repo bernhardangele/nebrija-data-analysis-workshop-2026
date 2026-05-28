@@ -462,10 +462,191 @@ $$\alpha = \frac{P(D | \theta_{\text{proposed}}) P(\theta_{\text{proposed}})}{P(
 
 ## Prior Specification
 
-Bayesian inference combines our **Priors** (prior beliefs about parameter scales) and **Likelihood** (observed data) to calculate the **Posterior** distribution:
+Bayesian inference combines our **Priors** (prior beliefs about parameter scales) and **Likelihood** (observed data) to calculate the **Posterior** distribution.
 
-* **Weakly Informative/Regularizing Priors:** Restrict parameters to physically/physiologically plausible bounds (e.g., response times cannot be negative or 10 seconds).
-* **Shrinkage:** Pulls extreme, noisy random effect estimates towards the group mean, preventing overfitting.
+::: {style="font-size: 65%;"}
+We can use the following types of priors:
+
+* **Uninformative priors:** Priors that do not provide any information about the parameters (e.g., uniform distribution). `brms` will use these by default for coefficents if no other prior is specified. These priors sound "objective", but they are actually extremely unrealistic since they consider an effect size of 100000 ms to be equally likely as 10 ms.
+    * The sampler may have to explore a very wide parameter space, which can lead to convergence issues and inefficient sampling.
+* **Weakly informative/regularizing priors:** These priors are centered on 0, but exclude impossible and improbable values. These priors do not need to be narrow -- even setting the widest range of parameters you would possibly consider helps the sampler avoid getting stuck.
+    * For example: From other studies, I think the discordant flanker might slow participants down somewhere between 0 and 50 ms compared to the congruent condition. Since I want to be particularly careful, I set a normal prior with mean 0 and SD 100 ms, which allows for a wide range of plausible effects (even in the opposite direction) but excludes extreme effects such as a differences of 10 s or more. Even with a moderate amount of observations in your data the exact width of the prior usually does not matter since the prior is easily overwhelmed by the observed data.
+* **Strongly informative priors**: These have a mean that is different from 0. You could use these if you are very confident about the direction and size of the effect based on previous research. However, these priors can be controversial and should be used with caution, as they can heavily influence the posterior distribution and may lead to biased results if the prior information is incorrect.
+:::
+
+
+## Priors for Coefficients (`class = "b"`)
+
+::: {.columns}
+::: {.column width="60%"}
+```{r}
+#| label: plot-coef-prior
+#| echo: false
+#| eval: true
+#| fig-align: "center"
+#| out-width: "100%"
+#| fig-height: 4.5
+#| message: false
+#| warning: false
+library(ggplot2)
+library(dplyr)
+
+x_seq <- seq(-1, 1, length.out = 500)
+df_coef <- bind_rows(
+  tibble(x = x_seq, y = 0.5, Prior = "Default: Flat Prior\n(Improper Uniform over [-Inf, +Inf])"),
+  tibble(x = x_seq, y = dnorm(x_seq, mean = 0, sd = 0.1), Prior = "Recommended: Normal(0, 0.1)\n(100 ms SD, concentrates near 0)")
+)
+
+ggplot(df_coef, aes(x = x, y = y, color = Prior)) +
+  geom_line(linewidth = 1.2) +
+  facet_wrap(~ Prior, scales = "free_y") +
+  scale_color_manual(values = c("#1F497D", "#C2002F")) +
+  theme_minimal(base_size = 13, base_family = "sans") +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(face = "bold", size = 11, color = "#1F497D"),
+    plot.title = element_text(face = "bold", color = "#1F497D", size = 14)
+  ) +
+  labs(
+    title = "Default vs. Recommended Priors for Coefficients",
+    x = "Effect Size (seconds)",
+    y = "Prior Probability Density"
+  )
+```
+:::
+
+::: {.column width="40%"}
+::: {style="font-size: 65%;"}
+**Default Prior:**
+
+* Flat prior allows **absurdly huge values** (e.g. slowing down by 1000s).
+* Can cause convergence issues as the sampler wastes time in impossible regions.
+
+**Recommended Prior:**
+
+* **Normal(0, 0.1)** (100 ms SD) on raw RT.
+* Restricts effects to plausible scales while being wide enough to let data speak.
+* center at 0 represents the conservative null hypothesis (shrinkage).
+:::
+:::
+:::
+
+
+## Priors for Group-Level SDs (`class = "sd"`)
+
+::: {.columns}
+::: {.column width="60%"}
+```{r}
+#| label: plot-sd-prior
+#| echo: false
+#| eval: true
+#| fig-align: "center"
+#| out-width: "100%"
+#| fig-height: 4.5
+#| message: false
+#| warning: false
+library(ggplot2)
+library(dplyr)
+
+x_seq <- seq(0, 4, length.out = 500)
+half_t_density <- function(x, df, scale) {
+  ifelse(x >= 0, 2 * dt(x / scale, df = df) / scale, 0)
+}
+
+df_sd <- bind_rows(
+  tibble(x = x_seq, y = half_t_density(x_seq, df = 3, scale = 2.5), Prior = "Default: Half-Student-t(3, 0, 2.5)\n(Heavy-tailed, peaks near 0, very thick tail)"),
+  tibble(x = x_seq, y = dexp(x_seq, rate = 2), Prior = "Recommended: Exponential(2)\n(Peak at 0, drops off quickly to prevent singular fits)")
+)
+
+ggplot(df_sd, aes(x = x, y = y, color = Prior)) +
+  geom_line(linewidth = 1.2) +
+  facet_wrap(~ Prior, scales = "free_y") +
+  scale_color_manual(values = c("#1F497D", "#C2002F")) +
+  theme_minimal(base_size = 13, base_family = "sans") +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(face = "bold", size = 11, color = "#1F497D"),
+    plot.title = element_text(face = "bold", color = "#1F497D", size = 14)
+  ) +
+  labs(
+    title = "Default vs. Recommended Priors for Group SDs",
+    x = "Standard Deviation (seconds)",
+    y = "Prior Probability Density"
+  )
+```
+:::
+
+::: {.column width="40%"}
+::: {style="font-size: 65%;"}
+**Default Prior:**
+* **Half-Student-t(3, 0, 2.5)**.
+* Heavy tail means it accommodates very large standard deviations easily.
+* Not regularizing enough if data is sparse or structure is complex.
+
+**Recommended Prior:**
+* **Exponential(2)** (mean = 0.5s).
+* Mode at 0 provides **shrinkage**: pulls group variation toward 0 unless supported by data.
+* **Prevents singular fits** (standard deviation estimating to exactly 0 or boundary) and stabilizes sampling.
+:::
+:::
+:::
+
+
+## Priors for Group Correlations (`class = "cor"`)
+
+::: {.columns}
+::: {.column width="60%"}
+```{r}
+#| label: plot-cor-prior
+#| echo: false
+#| eval: true
+#| fig-align: "center"
+#| out-width: "100%"
+#| fig-height: 4.5
+#| message: false
+#| warning: false
+library(ggplot2)
+library(dplyr)
+
+x_seq <- seq(-1, 1, length.out = 500)
+df_cor <- bind_rows(
+  tibble(x = x_seq, y = 0.5, Prior = "Default: LKJ(1)\n(Uniform over [-1, 1], all correlations equally likely)"),
+  tibble(x = x_seq, y = 0.75 * (1 - x_seq^2), Prior = "Recommended: LKJ(2)\n(Parabolic shape, penalizes extreme correlations)")
+)
+
+ggplot(df_cor, aes(x = x, y = y, color = Prior)) +
+  geom_line(linewidth = 1.2) +
+  facet_wrap(~ Prior, scales = "free_y") +
+  scale_color_manual(values = c("#1F497D", "#C2002F")) +
+  theme_minimal(base_size = 13, base_family = "sans") +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(face = "bold", size = 11, color = "#1F497D"),
+    plot.title = element_text(face = "bold", color = "#1F497D", size = 14)
+  ) +
+  labs(
+    title = "Default vs. Recommended LKJ Priors for Correlations",
+    x = "Correlation (r)",
+    y = "Prior Probability Density"
+  )
+```
+:::
+
+::: {.column width="40%"}
+::: {style="font-size: 65%;"}
+**Default Prior:**
+* **LKJ(1)** prior.
+* Completely uniform over correlation matrices.
+* Highly extreme correlation values like $\pm 0.99$ are just as likely as 0.
+
+**Recommended Prior:**
+* **LKJ(2)** prior (or larger, e.g., LKJ(4)).
+* Parabolic density shape centered at 0.
+* **Shrinks correlation estimates toward zero**, preventing over-fitting and stabilizing random slope-intercept covariance structures.
+:::
+:::
+:::
+
 
 ## Modeling response times with the Gaussian distribution in `brms` {.dark-bg background-color="#C2002F"}
 
@@ -505,7 +686,7 @@ Unlike `lme4`, `brms` will compute the full joint posterior distribution using M
 - **Data:** Same as `lme4`. A data frame with all the variables used in the formula.
 - **Priors:** We need to specify prior distributions for all our parameters. This is necessary in Bayesian statistics. `brms` has default priors that it uses if no prior is specified. 
 
-## Specifying Regularizing Priors
+## Specifying Priors
 
 Before running the model, we define regularizing priors to restrict parameters to physiologically plausible bounds and prevent singular fits:
 
@@ -514,15 +695,14 @@ Before running the model, we define regularizing priors to restrict parameters t
 #| echo: true
 priors_gaussian <- c(
   # you should set a prior for fixed effects
-  prior(normal(0, 0.1), class = "b"),          
+  prior(normal(0, 0.1), class = "b"), # this is our N(0,1) prior (100 ms SD)          
   # these are optional, the brms priors usually work well
   prior(exponential(2), class = "sd"),          # group-level SD variation
   prior(lkj(2), class = "cor")                  # correlation matrix prior
 )
 ```
 
-* **Intercept Prior:** Center prior knowledge around an average correct RT of 600 ms ($\pm 400$ ms bounds).
-* **LKJ Prior ($2$):** Pulls the correlation between random intercepts and slopes toward zero, avoiding the degenerate $\pm 1$ singular fits common in `lme4`.
+For most parameters except for the coefficients, the default priors work well.
 
 ## Model Output: Summary
 
@@ -559,7 +739,27 @@ knitr::kable(round(fixed_effects, 3), format = "markdown")
 :::
 
 * The **Intercept** (baseline RT) is estimated at `r round(summary(fit_gaussian)$fixed["Intercept", "Estimate"], 2)`s (approx. 490 ms).
-* Results are largely the same as the `lme4` model, but now we have **credible intervals** instead of confidence intervals. 
+* Results are largely similar to the `lme4` model, but now we have **credible intervals** instead of confidence intervals. 
+
+## Interpreting posterior distributions
+
+Unlike frequentist point estimates, Bayesian inference gives us a **full probability distribution** (the posterior) for each parameter. We can interpret this distribution in several intuitive ways:
+
+::: {style="font-size: 70%;"}
+### 1. Credible Intervals (CI)
+* A **95% Credible Interval** represents the range in which the true parameter value lies with **95% probability** (conditioned on the observed data and priors).
+* *Interpretation:* If the interval **does not contain 0**, we can conclude that 0 is an implausible value for the effect (analogous to rejecting the null, but with a direct probability statement).
+
+### 2. Probability of Direction ($pd$ / Proportion on One Side of 0)
+* We can calculate the proportion of the posterior distribution that lies on one side of 0 (e.g., $P(\beta > 0 | \text{data})$).
+* Calculated directly from the MCMC draws: `mean(draws > 0)` or `mean(draws < 0)`.
+* *Interpretation:* Extremely intuitive. If $98.5\%$ of the posterior draws are positive, we can state there is a **$98.5\%$ probability that the effect is positive** (e.g., that the flanker condition slows participants down).
+
+### 3. Bayes Factors (BF)
+* Quantifies the **relative evidence** that the data provides for the alternative hypothesis ($H_1$) vs. the null hypothesis ($H_0$).
+* A $BF_{10} = 15$ indicates that the observed data are 15 times more likely under $H_1$ than under $H_0$ (representing strong evidence for the effect).
+* *Implementation:* In `brms`, can be estimated via the **Savage-Dickey density ratio** using `hypothesis(model, "Condition = 0")` or by using bridge sampling via the `bayes_factor()` function.
+:::
 
 
 ## Interpreting MCMC Diagnostics
@@ -887,38 +1087,6 @@ blmm_acc <- brm(
   data = flanker_clean,
   family = bernoulli(link = "logit"),
   prior = prior(normal(0, 1), class = "b"),
-  chains = 4, iter = 4000, warmup = 2000,
-  cores = 4, backend = "cmdstanr"
-)
-```
-
-## Section 4: Modeling Eye Movements & Model Comparison {.dark-bg background-color="#1F497D"}
-
-## Shifted Lognormal for Eye-Tracking
-
-Like manual reaction times, eye-tracking duration measures (e.g. Total Viewing Time `tvt`) are highly skewed.
-However, eye-tracking fixations have a **physiological minimum duration** (typically around 50–80 ms) below which a fixation cannot be registered.
-
-::: {.accent-box}
-### The Shifted Lognormal Distribution
-The **Shifted Lognormal** distribution models the outcome on a log scale but adds a shift parameter ($ndt$: non-decision time) representing this absolute physiological floor:
-$$\text{tvt} \sim \text{Lognormal}(\mu, \sigma) + ndt$$
-:::
-
-## Fitting Eye-Tracking LMM in brms (Command)
-
-```{r}
-#| eval: false
-# Fit Shifted Lognormal LMM on Gaze-Contingent target word Total Viewing Time
-blmm_tvt <- brm(
-  formula = tvt ~ preview * number * target_gender + (1 | subject) + (1 | sentence_nr),
-  data = gaze_target %>% filter(tvt > 50 & tvt < 4000),
-  family = shifted_lognormal(),
-  prior = c(
-    prior(normal(5.5, 0.5), class = "Intercept"),
-    prior(normal(0, 0.2), class = "b"),
-    prior(exponential(1), class = "sd")
-  ),
   chains = 4, iter = 4000, warmup = 2000,
   cores = 4, backend = "cmdstanr"
 )

@@ -117,8 +117,8 @@ fit_exgaussian_mu <- brm(
     # Prior for global exponential parameter beta (raw scale class)
     prior(exponential(10), class = "beta")
   ),
-  chains = 4, iter = 2000, warmup = 1000,
-  control = list(adapt_delta = 0.95),
+  chains = 4, iter = 4000, warmup = 2000,
+  control = list(adapt_delta = 0.8),
   cores = 4, backend = "cmdstanr"
 )
 
