@@ -577,16 +577,23 @@ ggplot(df_sd, aes(x = x, y = y, color = Prior)) +
 :::
 
 ::: {.column width="40%"}
-::: {style="font-size: 65%;"}
+::: {style="font-size: 60%;"}
 **Default Prior:**
+
 * **Half-Student-t(3, 0, 2.5)**.
-* Heavy tail means it accommodates very large standard deviations easily.
-* Not regularizing enough if data is sparse or structure is complex.
+* Heavy tail accommodates very large standard deviations easily.
+* Less regularizing if data is sparse or structure is complex.
 
 **Recommended Prior:**
+
 * **Exponential(2)** (mean = 0.5s).
-* Mode at 0 provides **shrinkage**: pulls group variation toward 0 unless supported by data.
-* **Prevents singular fits** (standard deviation estimating to exactly 0 or boundary) and stabilizes sampling.
+* Mode at 0 provides **shrinkage** toward 0 unless supported by data.
+* **Prevents singular fits** and stabilizes sampling.
+* *Scaling Note:* Exponential priors **must be scaled** to your DV's measurement scale! `exponential(2)` (mean = 0.5s) works for RT in seconds. For milliseconds, scale the rate accordingly (e.g. `exponential(0.002)` for a 500 ms mean).
+
+::: {.accent-box}
+**Rule of Thumb:** When in doubt, use the default priors, **except** for fixed effect coefficients (where you should always specify a regularizing prior like `normal`).
+:::
 :::
 :::
 :::
@@ -635,11 +642,13 @@ ggplot(df_cor, aes(x = x, y = y, color = Prior)) +
 ::: {.column width="40%"}
 ::: {style="font-size: 65%;"}
 **Default Prior:**
+
 * **LKJ(1)** prior.
 * Completely uniform over correlation matrices.
 * Highly extreme correlation values like $\pm 0.99$ are just as likely as 0.
 
 **Recommended Prior:**
+
 * **LKJ(2)** prior (or larger, e.g., LKJ(4)).
 * Parabolic density shape centered at 0.
 * **Shrinks correlation estimates toward zero**, preventing over-fitting and stabilizing random slope-intercept covariance structures.
@@ -702,7 +711,11 @@ priors_gaussian <- c(
 )
 ```
 
-For most parameters except for the coefficients, the default priors work well.
+::: {.accent-box}
+**Rule of Thumb:** When in doubt, use the default priors, **except** for fixed effect coefficients (where you should always specify a regularizing prior like `normal(0, 0.1)`).
+
+*Note: The exponential prior for standard deviations must be scaled according to your dependent variable's measurement scale (seconds vs. milliseconds).*
+:::
 
 ## Model Output: Summary
 
@@ -738,28 +751,101 @@ knitr::kable(round(fixed_effects, 3), format = "markdown")
 
 :::
 
-* The **Intercept** (baseline RT) is estimated at `r round(summary(fit_gaussian)$fixed["Intercept", "Estimate"], 2)`s (approx. 490 ms).
+* The **Intercept** (baseline RT) is estimated at `r round(summary(fit_gaussian)$fixed["Intercept", "Estimate"], 2)`s.
 * Results are largely similar to the `lme4` model, but now we have **credible intervals** instead of confidence intervals. 
 
-## Interpreting posterior distributions
+## Interpreting Posterior Distributions
 
 Unlike frequentist point estimates, Bayesian inference gives us a **full probability distribution** (the posterior) for each parameter. We can interpret this distribution in several intuitive ways:
 
 ::: {style="font-size: 70%;"}
-### 1. Credible Intervals (CI)
-* A **95% Credible Interval** represents the range in which the true parameter value lies with **95% probability** (conditioned on the observed data and priors).
-* *Interpretation:* If the interval **does not contain 0**, we can conclude that 0 is an implausible value for the effect (analogous to rejecting the null, but with a direct probability statement).
-
-### 2. Probability of Direction ($pd$ / Proportion on One Side of 0)
-* We can calculate the proportion of the posterior distribution that lies on one side of 0 (e.g., $P(\beta > 0 | \text{data})$).
-* Calculated directly from the MCMC draws: `mean(draws > 0)` or `mean(draws < 0)`.
-* *Interpretation:* Extremely intuitive. If $98.5\%$ of the posterior draws are positive, we can state there is a **$98.5\%$ probability that the effect is positive** (e.g., that the flanker condition slows participants down).
-
-### 3. Bayes Factors (BF)
-* Quantifies the **relative evidence** that the data provides for the alternative hypothesis ($H_1$) vs. the null hypothesis ($H_0$).
-* A $BF_{10} = 15$ indicates that the observed data are 15 times more likely under $H_1$ than under $H_0$ (representing strong evidence for the effect).
-* *Implementation:* In `brms`, can be estimated via the **Savage-Dickey density ratio** using `hypothesis(model, "Condition = 0")` or by using bridge sampling via the `bayes_factor()` function.
+* **1. Credible Intervals (CI):**
+  * Defines the range in which the true parameter value lies with a specific probability (e.g., 95%), given the data and priors.
+  * If the interval excludes 0, we have strong evidence of an effect.
+* **2. Probability of Direction ($pd$):**
+  * The proportion of the posterior distribution that lies on one side of 0 (has the same sign as the mean).
+  * Represents the direct probability that an effect is positive or negative.
+* **3. Bayes Factors (BF):**
+  * Quantifies the relative evidence that the data provides for the alternative hypothesis ($H_1$) vs. the null hypothesis ($H_0$).
 :::
+
+
+## 1. Interpreting Credible Intervals: AGR/CON vs. DIS
+
+To test if the discordant flanker condition (`DIS`) slows down reaction times compared to the average of congruent and control conditions (`CON` and `AGR`), we check the posterior credible interval for:
+$$\beta_{\text{CON\_AGR\_vs\_DIS}} = \frac{\text{CON} + \text{AGR}}{2} - \text{DIS}$$
+
+::: {.accent-box}
+### Extracting Credible Intervals in R
+```{r}
+#| echo: true
+#| eval: true
+# Extract the coefficient summary from fit_gaussian
+coef_summary <- summary(fit_gaussian)$fixed["ConditionCON_AGR_vs_DIS", ]
+print(round(coef_summary[c("Estimate", "Est.Error", "l-95% CI", "u-95% CI")], 4))
+```
+:::
+
+::: {style="font-size: 65%;"}
+* **Key Interpretation:**
+  * The 95% Credible Interval ranges from **`r round(coef_summary["l-95% CI"] * 1000, 1)` ms** to **`r round(coef_summary["u-95% CI"] * 1000, 1)` ms**.
+  * Since the interval **does not contain 0**, we have strong evidence that the effect exists.
+  * There is a **95% probability** that the true difference is between `r round(coef_summary["l-95% CI"] * 1000, 1)` ms and `r round(coef_summary["u-95% CI"] * 1000, 1)` ms (conditioned on our data and priors).
+:::
+
+
+## 2. Probability of Direction ($pd$): AGR/CON vs. DIS
+
+Rather than a binary "significant / not significant" decision, we can calculate the exact probability that the interference effect is negative (i.e., that `DIS` is slower than `AGR/CON`).
+
+::: {.accent-box}
+### Calculating $pd$ from MCMC Draws in R
+```{r}
+#| echo: true
+#| eval: true
+# Extract the raw MCMC draws for the contrast
+draws <- as.data.frame(fit_gaussian)[["b_ConditionCON_AGR_vs_DIS"]]
+
+# Calculate the proportion of draws below 0
+pd <- mean(draws < 0)
+print(paste("Probability of Direction (pd):", round(pd * 100, 3), "%"))
+```
+:::
+
+::: {style="font-size: 65%;"}
+* **Key Interpretation:**
+  * There is a **`r round(pd * 100, 2)`% probability** that discordant flankers slow down response times compared to congruent/control flankers.
+  * This direct probability statement is highly intuitive and directly answers the scientific question, avoiding the common misinterpretations of frequentist $p$-values.
+  * If the effect were weaker and closer to 0, $pd$ would naturally decrease, representing a graded measure of evidence rather than a rigid threshold.
+:::
+
+
+## 3. Interpreting Bayes Factors: AGR/CON vs. DIS
+
+The Bayes Factor ($BF_{10}$) compares the relative evidence for the alternative hypothesis ($H_1$: $\beta \neq 0$) versus the null hypothesis ($H_0$: $\beta = 0$). In `brms`, the standard way to compute Savage-Dickey Bayes Factors is using the `hypothesis()` command.
+
+::: {.accent-box}
+### Testing the Contrast Hypothesis in R
+```{r}
+#| echo: true
+#| eval: true
+# Run Savage-Dickey hypothesis test on the contrast
+hyp <- hypothesis(fit_gaussian, "ConditionCON_AGR_vs_DIS = 0")
+print(hyp)
+```
+:::
+
+::: {style="font-size: 65%;"}
+* **Understanding `Evid.Ratio` (Bayes Factor):**
+  * The **`Evid.Ratio`** column shows the Savage-Dickey Bayes Factor. Here, it is **`NA`** because `brms` requires prior samples to be saved during fitting (`brm(..., sample_prior = "yes")`).
+  * **Manual Calculation:** Because it is `NA`, we can manually calculate it by comparing the prior density at 0 ($N(0, 0.1)$ density is $3.989$) to the posterior density at 0 ($0$ since draws are clustered away from 0):
+    $$BF_{10} = \frac{\text{prior density at 0}}{\text{posterior density at 0}} = \frac{3.989}{0} = \infty$$
+  * A $BF_{10} = \infty$ represents **extreme evidence** for the alternative hypothesis ($H_1$).
+  * **Interpreting BF scales (Lee & Wagenmakers, 2013):**
+    * $1 - 3$: Anecdotal | $3 - 10$: Moderate | $10 - 30$: Strong | $> 100$: Extreme evidence
+:::
+
+
 
 
 ## Interpreting MCMC Diagnostics
@@ -781,6 +867,28 @@ knitr::kable(round(diagnostics, 2), format = "markdown")
 
 * **$\hat{R}$ (Potential Scale Reduction Factor):** Measures variance between vs. within chains. At convergence, $\hat{R} \le 1.01$. Here, all $\hat{R}$ are exactly $1.00$ or $1.01$.
 * **ESS (Effective Sample Size):** Number of independent draws. Both **Bulk ESS** (for mean/medians) and **Tail ESS** (for credible intervals) should be $> 400$ (ideally $> 1000$).
+
+
+## Convergence Issues: Divergences & Treedepth
+
+In addition to $\hat{R}$ and ESS, we must check for Hamiltonian Monte Carlo-specific diagnostics that indicate numerical sampling instabilities:
+
+::: {style="font-size: 65%;"}
+### 1. Divergent Transitions ("Divergences")
+* **What it means:** The No-U-Turn Sampler's numerical simulation broke down because it hit a region of extremely high curvature (often a hierarchical "funnel" where a group SD is very close to 0).
+* **The danger:** The posterior estimates are **invalid and biased**. The sampler cannot explore the "funnel" and misses parts of the distribution.
+* **How to fix:**
+  * **Increase `adapt_delta`:** E.g., `control = list(adapt_delta = 0.95)` or `0.99`. This forces the sampler to take smaller, more precise steps.
+  * **Stronger regularizing priors:** Prevent Stan from drifting into extremely flat or highly curved, unstable areas.
+
+### 2. Maximum Treedepth Warnings
+* **What it means:** The sampler took too many steps (default maximum is $2^{10} = 1024$ steps) trying to build a trajectory before turning around. It was terminated early to prevent getting stuck in infinite loops.
+* **The danger:** It is **not mathematically invalid** (unlike divergences), but it indicates extreme inefficiency, very slow sampling times, and low ESS.
+* **How to fix:**
+  * **Increase `max_treedepth`:** E.g., `control = list(max_treedepth = 15)`.
+  * **Simplify random effects or improve priors:** High treedepth often indicates collinearity, overparameterization, or unidentifiable parameters.
+:::
+
 
 ## Posterior Predictive Check (PPC)
 
@@ -1061,103 +1169,8 @@ if (file.exists(mu_beta_file)) {
 ```
 
 ::: {.accent-box}
-The overall fit is very similar to when we assume a single value of $\beta$ for all observations, but now we can see if beta varies between any of the conditions.
+The fit is almost perfect! By allowing both $\mu$ and $\beta$ to vary, the model can flexibly capture changes in both the core Gaussian latency and the exponential tail, resulting in an excellent match to the raw RT distribution. Also, now we gain insight into where in the distribution our experimental effects are occurring (core latency vs. tail skew).
 :::
-
-## Section 3: Modeling Accuracy (Bernoulli) {.dark-bg background-color="#1F497D"}
-
-## Bernoulli GLMM for Binary Accuracy
-
-For single-trial binary accuracy data (`corr` = 0 or 1), the binomial model is simplified to a **Bernoulli distribution** with a logit link function:
-
-$$\text{corr} \sim \text{Bernoulli}(p)$$
-$$\text{logit}(p) = \log\left(\frac{p}{1-p}\right) = X\beta + Z u$$
-
-This models the probability $p$ of a correct response directly on the log-odds scale, utilizing a maximal random effects structure:
-
-## Fitting Bernoulli in brms (Command)
-
-```{r}
-#| eval: false
-# Fit Bernoulli multi-level model on all Flanker Exp 1 trials
-blmm_acc <- brm(
-  formula = corr ~ Condition * StimulusType + 
-    (Condition * StimulusType | subject) + 
-    (Condition | item),
-  data = flanker_clean,
-  family = bernoulli(link = "logit"),
-  prior = prior(normal(0, 1), class = "b"),
-  chains = 4, iter = 4000, warmup = 2000,
-  cores = 4, backend = "cmdstanr"
-)
-```
-
-## Bayesian MCMC Diagnostics
-
-Before interpreting posterior parameters, we MUST verify the sampling quality:
-
-1. **R-hat ($\hat{R}$):** Should be exactly $< 1.01$. Verifies that all chains converged onto the same posterior target.
-2. **Effective Sample Size (ESS):** Bulk and Tail ESS should be $> 1000$ to ensure stable posterior statistics.
-3. **Divergent Transitions:** Stan will warn if MCMC chains encounter numerical instability.
-   - *Fix:* Increase `control = list(adapt_delta = 0.98)`.
-
-## Posterior Predictive Checks
-
-A powerful feature of Bayesian models is simulating new datasets from the posterior and overlaying them on the actual data to see if the model successfully captured the shape, skewness, and boundaries:
-
-* **Visual Alignment:** We expect the simulated density curves to line up closely with the raw empirical data density.
-* **Warning Signs:** Mismatches in the peak height or tails indicate that the distribution family is poorly specified.
-
-## Generating Checks in R (Command)
-
-```{r}
-#| eval: false
-# Generate posterior predictive checks
-pp_check(blmm_rt, ndraws = 100)
-pp_check(blmm_tvt, ndraws = 100)
-```
-
-## Model Comparison via LOO-CV
-
-To compare competing models (e.g. whether a log-normal distribution or a shifted-lognormal distribution fits our eye-tracking data better), we use **Leave-One-Out Cross-Validation (LOO-CV)**:
-
-* **Expected Log Predictive Density (`elpd`):** Quantifies expected out-of-sample predictive accuracy.
-* **Comparison Matrix:** Models are ordered by predictive performance. Competing models are compared to the best model using standard error differences.
-
-## Computing LOO in R (Command)
-
-```{r}
-#| eval: false
-# Compute LOO criteria
-loo_model1 <- loo(blmm_tvt)
-loo_model2 <- loo(blmm_tvt_lognormal)
-
-# Compare expected log pointwise predictive density (elpd)
-loo_compare(loo_model1, loo_model2)
-```
-
-## Posterior Inferences & Hypothesis Testing
-
-In the Bayesian framework, we do not need arbitrary $p$-values. We can draw posterior samples and directly compute the probability of our experimental hypotheses:
-
-* **Directional Probability:** e.g., what is the probability that our concordant flanker effect is less than zero ($P(\beta < 0)$)?
-* **Credible Intervals:** Express uncertainty directly (e.g., "There is a $95\%$ probability that the true effect lies between $-35\text{ms}$ and $-5\text{ms}$").
-
-## Querying Posteriors in R (Command)
-
-```{r}
-#| eval: false
-library(tidybayes)
-
-# Get posterior samples for the flanker condition contrast
-post_samples <- blmm_rt %>%
-  spread_draws(b_ConditionCON_vs_AGR)
-
-# What is the probability that Concordant flankers are faster than Control?
-# (i.e. that the difference is negative)
-prob_faster <- mean(post_samples$b_ConditionCON_vs_AGR < 0)
-cat("P(Concordant < Control) =", prob_faster * 100, "%\n")
-```
 
 ## Session 2 Summary
 
