@@ -74,6 +74,7 @@ fit_gaussian <- brm(
     prior(exponential(2), class = "sd"),
     prior(lkj(2), class = "cor")
   ),
+  sample_prior = "yes",
   chains = 4, iter = 2000, warmup = 1000,
   cores = 4, backend = "cmdstanr"
 )
@@ -117,6 +118,7 @@ fit_exgaussian_mu <- brm(
     # Prior for global exponential parameter beta (raw scale class)
     prior(exponential(10), class = "beta")
   ),
+  sample_prior = "yes",
   chains = 4, iter = 4000, warmup = 2000,
   control = list(adapt_delta = 0.8),
   cores = 4, backend = "cmdstanr"
@@ -169,6 +171,7 @@ fit_exgaussian_mu_beta <- brm(
     prior(normal(0, 0.3), class = "b", dpar = "beta"),
     prior(exponential(2), class = "sd", dpar = "beta")
   ),
+  sample_prior = "yes",
   chains = 4, iter = 2000, warmup = 1000,
   control = list(adapt_delta = 0.8),
   cores = 4, backend = "cmdstanr",

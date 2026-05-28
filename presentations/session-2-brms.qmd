@@ -451,15 +451,6 @@ $$\alpha = \frac{P(D | \theta_{\text{proposed}}) P(\theta_{\text{proposed}})}{P(
 - Modern MCMC algorithms, such as Hamiltonian Monte Carlo (HMC) and its variant No-U-Turn Sampler (NUTS), are more efficient than the basic Metropolis-Hastings algorithm. They can explore the parameter space more effectively and converge faster.
 
 
-## The Bayesian Solution
-
-::: {.accent-box}
-### Three Bayesian Columns
-* **Priors:** Regularize parameters and prevent singular fits through shrinkage.
-* **Flexible Families:** Model skewed distributions (ex-Gaussian, Shifted Lognormal) directly on the raw scale.
-* **Posterior Distributions:** Obtain direct probability statements regarding our hypotheses.
-:::
-
 ## Prior Specification
 
 Bayesian inference combines our **Priors** (prior beliefs about parameter scales) and **Likelihood** (observed data) to calculate the **Posterior** distribution.
@@ -531,6 +522,8 @@ ggplot(df_coef, aes(x = x, y = y, color = Prior)) +
 :::
 :::
 
+* Pick a prior that is appropriate for your effect size!
+
 
 ## Priors for Group-Level SDs (`class = "sd"`)
 
@@ -591,13 +584,13 @@ ggplot(df_sd, aes(x = x, y = y, color = Prior)) +
 * **Prevents singular fits** and stabilizes sampling.
 * *Scaling Note:* Exponential priors **must be scaled** to your DV's measurement scale! `exponential(2)` (mean = 0.5s) works for RT in seconds. For milliseconds, scale the rate accordingly (e.g. `exponential(0.002)` for a 500 ms mean).
 
-::: {.accent-box}
-**Rule of Thumb:** When in doubt, use the default priors, **except** for fixed effect coefficients (where you should always specify a regularizing prior like `normal`).
-:::
 :::
 :::
 :::
 
+::: {.accent-box}
+**Rule of Thumb:** When in doubt, use the default priors, **except** for fixed effect coefficients (where you should always specify a regularizing prior like `normal`).
+:::
 
 ## Priors for Group Correlations (`class = "cor"`)
 
@@ -657,7 +650,7 @@ ggplot(df_cor, aes(x = x, y = y, color = Prior)) +
 :::
 
 
-## Modeling response times with the Gaussian distribution in `brms` {.dark-bg background-color="#C2002F"}
+## Modeling response times with the Gaussian distribution {.dark-bg background-color="#C2002F"}
 
 ## Fit the model with `brms`
 
@@ -677,6 +670,7 @@ fit_gaussian <- brm(
   data = flanker_sub,
   family = gaussian(),
   prior = priors_gaussian,
+  sample_prior = "yes", # this is important if you want to get Bayes factors later
   chains = 4, iter = 2000, warmup = 1000,
   cores = 4, backend = "cmdstanr",
   # if you have enough processor cores, you can speed up the model by using 2 or more cores per chain
@@ -712,9 +706,7 @@ priors_gaussian <- c(
 ```
 
 ::: {.accent-box}
-**Rule of Thumb:** When in doubt, use the default priors, **except** for fixed effect coefficients (where you should always specify a regularizing prior like `normal(0, 0.1)`).
-
-*Note: The exponential prior for standard deviations must be scaled according to your dependent variable's measurement scale (seconds vs. milliseconds).*
+When in doubt, use the default priors, **except** for fixed effect coefficients (where you should always specify a regularizing prior like `normal(0, 0.1)`).
 :::
 
 ## Model Output: Summary
@@ -773,7 +765,7 @@ Unlike frequentist point estimates, Bayesian inference gives us a **full probabi
 ## 1. Interpreting Credible Intervals: AGR/CON vs. DIS
 
 To test if the discordant flanker condition (`DIS`) slows down reaction times compared to the average of congruent and control conditions (`CON` and `AGR`), we check the posterior credible interval for:
-$$\beta_{\text{CON\_AGR\_vs\_DIS}} = \frac{\text{CON} + \text{AGR}}{2} - \text{DIS}$$
+$$\beta_{\text{CON_AGR_vs_DIS}} = \frac{\text{CON} + \text{AGR}}{2} - \text{DIS}$$
 
 ::: {.accent-box}
 ### Extracting Credible Intervals in R
@@ -798,7 +790,6 @@ print(round(coef_summary[c("Estimate", "Est.Error", "l-95% CI", "u-95% CI")], 4)
 
 Rather than a binary "significant / not significant" decision, we can calculate the exact probability that the interference effect is negative (i.e., that `DIS` is slower than `AGR/CON`).
 
-::: {.accent-box}
 ### Calculating $pd$ from MCMC Draws in R
 ```{r}
 #| echo: true
@@ -810,7 +801,7 @@ draws <- as.data.frame(fit_gaussian)[["b_ConditionCON_AGR_vs_DIS"]]
 pd <- mean(draws < 0)
 print(paste("Probability of Direction (pd):", round(pd * 100, 3), "%"))
 ```
-:::
+
 
 ::: {style="font-size: 65%;"}
 * **Key Interpretation:**
@@ -824,7 +815,7 @@ print(paste("Probability of Direction (pd):", round(pd * 100, 3), "%"))
 
 The Bayes Factor ($BF_{10}$) compares the relative evidence for the alternative hypothesis ($H_1$: $\beta \neq 0$) versus the null hypothesis ($H_0$: $\beta = 0$). In `brms`, the standard way to compute Savage-Dickey Bayes Factors is using the `hypothesis()` command.
 
-::: {.accent-box}
+
 ### Testing the Contrast Hypothesis in R
 ```{r}
 #| echo: true
@@ -833,20 +824,16 @@ The Bayes Factor ($BF_{10}$) compares the relative evidence for the alternative 
 hyp <- hypothesis(fit_gaussian, "ConditionCON_AGR_vs_DIS = 0")
 print(hyp)
 ```
-:::
+
 
 ::: {style="font-size: 65%;"}
 * **Understanding `Evid.Ratio` (Bayes Factor):**
-  * The **`Evid.Ratio`** column shows the Savage-Dickey Bayes Factor. Here, it is **`NA`** because `brms` requires prior samples to be saved during fitting (`brm(..., sample_prior = "yes")`).
-  * **Manual Calculation:** Because it is `NA`, we can manually calculate it by comparing the prior density at 0 ($N(0, 0.1)$ density is $3.989$) to the posterior density at 0 ($0$ since draws are clustered away from 0):
-    $$BF_{10} = \frac{\text{prior density at 0}}{\text{posterior density at 0}} = \frac{3.989}{0} = \infty$$
-  * A $BF_{10} = \infty$ represents **extreme evidence** for the alternative hypothesis ($H_1$).
+  * The **`Evid.Ratio`** column shows the Savage-Dickey Bayes Factor.
+  * Note that this **only works** if you add `sample_prior = "yes"` to the `brm()` command when fitting the model!
+  * The result will be **`NA`** if the model was fit without saving prior samples.
   * **Interpreting BF scales (Lee & Wagenmakers, 2013):**
     * $1 - 3$: Anecdotal | $3 - 10$: Moderate | $10 - 30$: Strong | $> 100$: Extreme evidence
 :::
-
-
-
 
 ## Interpreting MCMC Diagnostics
 
@@ -1030,10 +1017,10 @@ if (file.exists(mu_file)) {
 :::
 
 ::: {.accent-box}
-* **$\beta$ (Exponential Scale)** is estimated globally on the raw scale: 
+* **$\beta$ (Exponential Scale):** A single value is estimated for $\beta$ across all conditions, representing the average scale of the exponential tail. In this model, $\beta$ is approximately 0.1s (100 ms), indicating that on average, the exponential tail adds about 100 ms of latency to the core Gaussian component. 
 `r if (file.exists(here("presentations", "fit_exgaussian_mu.qs2"))) {
   fit_exg_mu <- qs_read(here("presentations", "fit_exgaussian_mu.qs2"))
-  paste0(round(summary(fit_exg_mu)$spec_pars["beta", "Estimate"], 3), "s (approx. ", round(summary(fit_exg_mu)$spec_pars["beta", "Estimate"] * 1000), " ms of exponential tail latency)")
+  paste0(round(summary(fit_exg_mu)$spec_pars["beta", "Estimate"], 3), "s (approx. ", round(summary(fit_exg_mu)$spec_pars["beta", "Estimate"] * 1000), " of latency added by the exponential tail)")
 } else {
   "TBD (run model fitting script first)"
 }`
@@ -1174,11 +1161,19 @@ The fit is almost perfect! By allowing both $\mu$ and $\beta$ to vary, the model
 
 ## Session 2 Summary
 
-1. **Bayesian Advantages:** Regularizing priors prevent singular fits, while flexible likelihood families model real-world distributions directly.
-2. **ex-Gaussian RTs:** Models core cognitive speed ($\mu$) and exponential skew tail ($\beta$) simultaneously.
-3. **Bernoulli Accuracy:** Fits single-trial binary accuracy without aggregation.
-4. **Shifted Lognormal Eye Movements:** Respects the physiological minimum duration limit of fixations.
-5. **MCMC Diagnostics & Verification:** Always verify $\hat{R} < 1.01$ and run `pp_check` to validate predictive accuracy.
+::: {style="font-size: 70%;"}
+1. We have seen how you can use `brms` to fit Bayesian linear mixed models with the same formula syntax as `lme4`, but with the added flexibility of specifying priors and modeling different likelihood families (e.g. ex-Gaussian for RTs).
+2. **Posterior Interpretation:** We interpret Bayesian model outputs using three complementary metrics:
+   * **Credible Intervals (CI):** Direct probability (e.g. 95%) that the true effect lies in a given range.
+   * **Probability of Direction ($pd$):** Graded direct probability that an effect is positive or negative.
+   * **Bayes Factors (BF):** Relative evidence for alternative vs. null ($H_1$ vs. $H_0$), computed in `brms` using `hypothesis(..., sample_prior="yes")`.
+3. **HMC Convergence Diagnostics:** When using `brms` and Stan, you must verify that chains have converged by ensuring $\hat{R} \le 1.01$ and ESS $> 1000$. Your model must not have any **divergent transitions** (try increasing `adapt_delta`). If you get warnings about exceeding **maximum treedepth limits**, your model may be very inefficient and require simplification or stronger priors.
+4. **Model Verification:** Always perform Posterior Predictive Checks (`pp_check()`) to visually confirm that the model's posterior predictions accurately recreate the shape of the observed data.
+:::
+
+## Homework
+
+Try to apply the concepts from this session to your own data! Fit a Bayesian linear mixed model using `brms` with appropriate priors, check convergence diagnostics, and perform posterior predictive checks to evaluate model fit. Write a results section interpreting the credible intervals, probability of direction, and Bayes factors for your key contrasts. See @serrano-carot2026lcn for an example of how to write up Bayesian results.
 
 ## References
 

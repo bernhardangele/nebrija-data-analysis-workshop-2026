@@ -1,0 +1,2190 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="session-2-brms_files/libs/clipboard/clipboard.min.js"></script>
+<script src="session-2-brms_files/libs/quarto-html/tabby.min.js"></script>
+<script src="session-2-brms_files/libs/quarto-html/popper.min.js"></script>
+<script src="session-2-brms_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href="session-2-brms_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="session-2-brms_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href="session-2-brms_files/libs/quarto-html/quarto-syntax-highlighting-845c23b38eaddc0f92fda52bfe77a8c8.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.9.36">
+
+  <meta name="author" content="Dr.&nbsp;Bernhard Angele">
+  <title>Session 2: Bayesian Mixed-Effects Models with brms</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="session-2-brms_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href="session-2-brms_files/libs/revealjs/dist/reveal.css">
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      { color: #003b4f; background-color: #f1f3f5; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #003b4f; } /* Normal */
+    code span.al { color: #ad0000; } /* Alert */
+    code span.an { color: #5e5e5e; } /* Annotation */
+    code span.at { color: #657422; } /* Attribute */
+    code span.bn { color: #ad0000; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #003b4f; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #20794d; } /* Char */
+    code span.cn { color: #8f5902; } /* Constant */
+    code span.co { color: #5e5e5e; } /* Comment */
+    code span.cv { color: #5e5e5e; font-style: italic; } /* CommentVar */
+    code span.do { color: #5e5e5e; font-style: italic; } /* Documentation */
+    code span.dt { color: #ad0000; } /* DataType */
+    code span.dv { color: #ad0000; } /* DecVal */
+    code span.er { color: #ad0000; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #ad0000; } /* Float */
+    code span.fu { color: #4758ab; } /* Function */
+    code span.im { color: #00769e; } /* Import */
+    code span.in { color: #5e5e5e; } /* Information */
+    code span.kw { color: #003b4f; font-weight: bold; } /* Keyword */
+    code span.op { color: #5e5e5e; } /* Operator */
+    code span.ot { color: #003b4f; } /* Other */
+    code span.pp { color: #ad0000; } /* Preprocessor */
+    code span.sc { color: #5e5e5e; } /* SpecialChar */
+    code span.ss { color: #20794d; } /* SpecialString */
+    code span.st { color: #20794d; } /* String */
+    code span.va { color: #111111; } /* Variable */
+    code span.vs { color: #20794d; } /* VerbatimString */
+    code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
+    /* CSS for citations */
+    div.csl-bib-body { }
+    div.csl-entry {
+      clear: both;
+      margin-bottom: 0em;
+    }
+    .hanging-indent div.csl-entry {
+      margin-left:2em;
+      text-indent:-2em;
+    }
+    div.csl-left-margin {
+      min-width:2em;
+      float:left;
+    }
+    div.csl-right-inline {
+      margin-left:2em;
+      padding-left:1em;
+    }
+    div.csl-indent {
+      margin-left: 2em;
+    }  </style>
+  <link rel="stylesheet" href="session-2-brms_files/libs/revealjs/dist/theme/quarto-221e871ebcaed704597e7b338bddf024.css">
+  <link rel="stylesheet" href="animation_styles.css">
+  <link href="session-2-brms_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href="session-2-brms_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href="session-2-brms_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href="session-2-brms_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" class="quarto-title-block center">
+  <h1 class="title">Session 2: Bayesian Mixed-Effects Models with brms</h1>
+  <p class="subtitle">Ex-Gaussian RTs, Bernoulli Accuracy, and Shifted Lognormal Eye Movements</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+Dr.&nbsp;Bernhard Angele 
+</div>
+</div>
+</div>
+
+</section>
+<section id="workshop-plan" class="slide level2">
+<h2>Workshop plan</h2>
+<p>Welcome to our workshop on analyzing data from experiments in cognitive psychology, and linguistics, and education using frequentist and Bayesian linear mixed models.</p>
+<p>Here is the plan for this workshop:</p>
+<ul>
+<li class="fragment"><strong>Session 1 (yesterday)</strong>
+<ul>
+<li class="fragment"><strong>Part 1</strong> Introducing the workshop data sets</li>
+<li class="fragment"><strong>Part 2:</strong> Data preprocessing, exclusions, and custom contrast coding</li>
+<li class="fragment"><strong>Part 3:</strong> Linear mixed-effects modeling of response times (Gaussian) using <code>lme4</code></li>
+</ul></li>
+<li class="fragment"><strong>Session 2 (today)</strong>
+<ul>
+<li class="fragment"><strong>Part 1</strong> Introduction to Bayesian models</li>
+<li class="fragment"><strong>Part 2:</strong> Modeling response times with the Gaussian distribution in <code>brms</code></li>
+<li class="fragment"><strong>Part 3:</strong> Using the ex-Gaussian distribution in <code>brms</code></li>
+<li class="fragment"><strong>Part 4:</strong> Predicting multiple parameters</li>
+</ul></li>
+</ul>
+</section>
+<section id="part-1-introduction-to-bayesian-models" class="slide level2 dark-bg" data-background-color="#C2002F">
+<h2>Part 1: Introduction to Bayesian models</h2>
+</section>
+<section id="why-bayesian-multilevel-models" class="slide level2">
+<h2>Why Bayesian Multilevel Models?</h2>
+<p>Yesterday, we have seen that frequentist models (<code>lme4</code>) suffer from critical limitations:</p>
+<ol type="1">
+<li class="fragment"><strong>Convergence Issues:</strong> Complex maximal random-effect structures often fail to converge or result in zero-variance estimates.</li>
+<li class="fragment"><strong>Only work with a handful of distributions:</strong> RTs (and other measures such as eye-tracking fixation durations) are highly skewed. This can be addressed with transformations, but it is not ideal. The Gaussian family cannot model the true shape of the data.</li>
+<li class="fragment"><strong>Conceptual issues of frequentist inference:</strong> Confidence intervals and <span class="math inline">\(p\)</span>-values are frequently misinterpreted; they do not state the probability of an effect being true.</li>
+</ol>
+</section>
+<section id="basic-introduction-to-bayesian-inference" class="slide level2">
+<h2>Basic introduction to Bayesian Inference</h2>
+<ul>
+<li class="fragment">In frequentist statistics, we set up a “straw man” hypothesis (the null) and compute the probability of observing our data (or more extreme) if the null were true. This is the <span class="math inline">\(p\)</span>-value, a probability of the data given a hypothesis (the hypothesis that the parameter specifying the size of our effect is zero). The <span class="math inline">\(p\)</span>-value is often misinterpreted as the probability that our hypothesis is true, which it is not.</li>
+<li class="fragment">Bayesian inference allows us directly estimate the probability of our hypotheses (or, more generally, the parameters of our model) given the data. This is done by combining our prior beliefs (priors) with the likelihood of the observed data to obtain a posterior distribution over our parameters of interest.</li>
+</ul>
+</section>
+<section id="bayes-theorem" class="slide level2">
+<h2>Bayes’ Theorem</h2>
+<p>Bayes’ theorem formalizes the process of updating our beliefs about parameters <span class="math inline">\(\theta\)</span> in light of new data <span class="math inline">\(D\)</span>: <span class="math display">\[P(\theta | D) = \frac{P(D | \theta) P(\theta)}{P(D)}\]</span> Where:</p>
+<ul>
+<li class="fragment"><span class="math inline">\(P(\theta | D)\)</span> is the posterior distribution of the parameters <span class="math inline">\(\theta\)</span> given the data <span class="math inline">\(D\)</span>.</li>
+<li class="fragment"><span class="math inline">\(P(D | \theta)\)</span> is the likelihood of the data given the parameters.</li>
+<li class="fragment"><span class="math inline">\(P(\theta)\)</span> is the prior distribution of the parameters.</li>
+<li class="fragment"><span class="math inline">\(P(D)\)</span> is the marginal likelihood of the data, which serves as a normalizing constant.</li>
+</ul>
+<p>The new probability distribution <span class="math inline">\(P(\theta | D)\)</span> (the posterior) can become the prior for the next round of data collection, allowing for continuous updating of our beliefs as we gather more evidence.</p>
+</section>
+<section id="why-doesnt-everyone-use-bayesian-models" class="slide level2">
+<h2>Why doesn’t everyone use Bayesian models?</h2>
+<ul>
+<li class="fragment"><strong>Computational Complexity:</strong> Frequentist statistics rely on very simple probability distributions and many methods have closed-form solutions. You can literally do an ANOVA with a calculator!
+<ul>
+<li class="fragment">Of course, linear mixed models introduce computational complexity of their own. They are still usually much faster to fit (unless you specify a model with convergence issues!).</li>
+<li class="fragment">Bayesian models, on the other hand, normally require Markov Chain Monte Carlo (MCMC) sampling to approximate the posterior distribution, which can be computationally intensive, especially for complex models or large datasets.
+<ul>
+<li class="fragment">However, modern hardware and efficient algorithms (e.g., Hamiltonian Monte Carlo) are perfectly capable of fitting Bayesian models in a reasonable time frame.</li>
+<li class="fragment">Your laptop can probably do it, although you may want to take a break and get a coffee while it runs.</li>
+</ul></li>
+</ul></li>
+</ul>
+</section>
+<section id="why-doesnt-everyone-use-bayesian-models-continued" class="slide level2">
+<h2>Why doesn’t everyone use Bayesian models? (continued)</h2>
+<ul>
+<li class="fragment"><strong>Steep Learning Curve:</strong> Bayesian statistics require a different way of thinking about probability and inference. It can be challenging for those trained in the frequentist paradigm to understand concepts like priors, posteriors, and credible intervals.
+<ul>
+<li class="fragment"><strong>Software and Tools:</strong> Software like <code>brms</code> has made Bayesian modeling as easy as fitting an LMM in <code>lme4</code>.
+<ul>
+<li class="fragment">There is a danger here, since you do not have to understand the underlying mechanics to fit a Bayesian model that you may then be unable to interpret correctly!</li>
+</ul></li>
+</ul></li>
+</ul>
+</section>
+<section id="how-does-mcmc-work" class="slide level2">
+<h2>How does MCMC work?</h2>
+<ul>
+<li class="fragment"><strong>Markov Chain Monte Carlo (MCMC)</strong> allows us to sample from complex, high-dimensional posterior distributions that cannot be solved analytically.</li>
+<li class="fragment">By sampling the posterior distribution one point at a time, we avoid the need to compute the marginal likelihood <span class="math inline">\(P(D)\)</span>, which be very difficult to calculate. Instead, we can approximate the posterior distribution by generating a large number of samples from it.</li>
+</ul>
+</section>
+<section id="metropolis-hastings-algorithm" class="slide level2">
+<h2>Metropolis-Hastings Algorithm</h2>
+<ol type="1">
+<li class="fragment"><strong>Start:</strong> Place a random walker at an initial state <span class="math inline">\(\theta\)</span>.</li>
+<li class="fragment"><strong>Propose:</strong> Propose a candidate state <span class="math inline">\(\theta_{\text{proposed}}\)</span> from a symmetric proposal distribution (e.g., Gaussian step size).</li>
+<li class="fragment"><strong>Acceptance Ratio:</strong> Compute the probability ratio: <span class="math display">\[\alpha = \frac{P(\theta_{\text{proposed}} | D)}{P(\theta_{\text{current}} | D)}\]</span></li>
+<li class="fragment"><strong>Decision:</strong>
+<ul>
+<li class="fragment">If <span class="math inline">\(\alpha \ge 1\)</span>: <strong>Accept</strong> the move.</li>
+<li class="fragment">If <span class="math inline">\(\alpha &lt; 1\)</span>: <strong>Accept with probability <span class="math inline">\(\alpha\)</span></strong>. Otherwise, <strong>reject</strong> and stay at the current state.</li>
+</ul></li>
+</ol>
+<ul>
+<li class="fragment">This works: The samples will be a representative draw from the true posterior distribution. If the proposal distribution is not symmetric, we can adjust the acceptance ratio to account for the asymmetry, but the core idea remains the same.</li>
+</ul>
+</section>
+<section id="metropolis-hastings-the-mathematical-trick" class="slide level2">
+<h2>Metropolis-Hastings: The Mathematical Trick</h2>
+<p>MH compares the posterior probability of the proposed state to the current state:</p>
+<p><span class="math display">\[\alpha = \frac{P(\theta_{\text{proposed}} | D)}{P(\theta_{\text{current}} | D)}\]</span></p>
+<p>Let’s expand that using Bayes’ theorem:</p>
+<p><span class="math display">\[\alpha = \frac{\frac{P(D | \theta_{\text{proposed}}) P(\theta_{\text{proposed}})}{P(D)}}{\frac{P(D | \theta_{\text{current}}) P(\theta_{\text{current}})}{P(D)}}\]</span></p>
+<div class="accent-box">
+<p>Notice what happens to the impossible-to-calculate denominator, <span class="math inline">\(P(D)\)</span>: <strong>It completely cancels out!</strong></p>
+<p><span class="math display">\[\alpha = \frac{P(D | \theta_{\text{proposed}}) P(\theta_{\text{proposed}})}{P(D | \theta_{\text{current}}) P(\theta_{\text{current}})}\]</span></p>
+</div>
+</section>
+<section id="simulating-mcmc-sampling" class="slide level2">
+<h2>Simulating MCMC Sampling</h2>
+<div id="mcmc-card" style="background: #1e1e24; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); color: #e2e8f0; font-family: monospace; display: flex; flex-direction: column; align-items: center; max-width: 780px; margin: 0 auto;">
+    <h4 style="margin: 0 0 5px 0; color: #a5b4fc; font-size: 16px;">MCMC Joint, Marginal &amp; Parameter Chain Sampler</h4>
+    <p style="margin: 0 0 10px 0; font-size: 11px; color: #a1a1aa; text-align: center;">Concentric rings: target contours. Histograms: empirical margins. Right: trace plot chains.</p>
+    
+    <canvas id="mcmcCanvas" width="750" height="450" style="border: 1px solid #3f3f46; border-radius: 6px; background: #09090b; display: block;"></canvas>
+    
+    <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 12px;">
+        <label for="speedSlider">Speed:</label>
+        <input type="range" id="speedSlider" min="1" max="100" value="35" style="cursor: pointer; width: 180px;">
+    </div>
+
+    <div style="margin-top: 10px; display: flex; gap: 10px; font-size: 11px; width: 100%; justify-content: center;">
+        <div style="background: #27272a; padding: 6px 10px; border-radius: 6px; border: 1px solid #3f3f46; text-align: center;">Samples: <span id="totalSamples" style="font-weight: bold; color: #a5b4fc;">0</span></div>
+        <div style="background: #27272a; padding: 6px 10px; border-radius: 6px; border: 1px solid #3f3f46; text-align: center;">Accept Rate: <span id="accRate" style="font-weight: bold; color: #a5b4fc;">0.0%</span></div>
+    </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('mcmcCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // Layout geometry config
+  const PAD_LEFT = 50;
+  const PAD_TOP = 100;
+  const MAIN_SIZE = 320; 
+  const MARGIN_PANEL_SIZE = 90; 
+
+  // Geometry config for chains
+  const CHAIN_X_START = 490;
+  const CHAIN_WIDTH = 230;
+  const CHAIN_HEIGHT = 100;
+  const CHAIN_Y1_START = 105; // X parameter chain (mu)
+  const CHAIN_Y2_START = 265; // Y parameter chain (beta)
+
+  // Simulation settings
+  let currentX = 0.0;
+  let currentY = 0.0;
+  const proposalSigma = 0.4;
+
+  let samples = [];
+  let totalAttempts = 0;
+  let totalAccepts = 0;
+  let frameCounter = 0;
+
+  const numBins = 50;
+  const binsX = new Array(numBins).fill(0);
+  const binsY = new Array(numBins).fill(0);
+
+  let proposedX = null;
+  let proposedY = null;
+  let proposalAccepted = false;
+
+  const speedSlider = document.getElementById('speedSlider');
+  const totalSamplesEl = document.getElementById('totalSamples');
+  const accRateEl = document.getElementById('accRate');
+
+  function toCanvasX(x) { return PAD_LEFT + (x + 3) * (MAIN_SIZE / 6); }
+  function toCanvasY(y) { return PAD_TOP + (3 - y) * (MAIN_SIZE / 6); }
+
+  function targetPDF(x, y) {
+      const q = x * x - 1.2 * x * y + y * y;
+      return Math.exp(-0.5 * q);
+  }
+
+  // Pre-render background space with Heatmap + Contour Lines
+  const bgCanvas = document.createElement('canvas');
+  bgCanvas.width = MAIN_SIZE;
+  bgCanvas.height = MAIN_SIZE;
+  const bgCtx = bgCanvas.getContext('2d');
+
+  function preRenderBackground() {
+      // 1. Draw smooth underlying density gradient
+      const imgData = bgCtx.createImageData(MAIN_SIZE, MAIN_SIZE);
+      for (let cx = 0; cx < MAIN_SIZE; cx++) {
+          for (let cy = 0; cy < MAIN_SIZE; cy++) {
+              const x = (cx / MAIN_SIZE) * 6 - 3;
+              const y = 3 - (cy / MAIN_SIZE) * 6;
+              const prob = targetPDF(x, y);
+              const index = (cx + cy * MAIN_SIZE) * 4;
+              
+              imgData.data[index] = 31;                         // R (Nebrija Navy base)
+              imgData.data[index + 1] = 73;                     // G
+              imgData.data[index + 2] = 125 * prob + 30;        // B
+              imgData.data[index + 3] = 255 * prob * 0.35;      // Subtle background alpha
+          }
+      }
+      bgCtx.putImageData(imgData, 0, 0);
+
+      // 2. Overlay analytical Contour Rings
+      const contourLevels = [0.1, 0.3, 0.5, 0.7, 0.9];
+      const scale = MAIN_SIZE / 6; // pixels per mathematical unit
+      const centerX = MAIN_SIZE / 2;
+      const centerY = MAIN_SIZE / 2;
+
+      bgCtx.lineWidth = 1.5;
+      
+      contourLevels.forEach(level => {
+          const c = -2 * Math.log(level);
+          const radiusX = Math.sqrt(c / 0.4) * scale; // Major axis length
+          const radiusY = Math.sqrt(c / 1.6) * scale; // Minor axis length
+          
+          bgCtx.beginPath();
+          bgCtx.ellipse(centerX, centerY, radiusX, radiusY, -Math.PI / 4, 0, 2 * Math.PI);
+          bgCtx.strokeStyle = `rgba(129, 140, 248, ${0.2 + level * 0.5})`;
+          bgCtx.stroke();
+      });
+  }
+  preRenderBackground();
+
+  function randomNormal() {
+      let u = 0, v = 0;
+      while(u === 0) u = Math.random(); 
+      while(v === 0) v = Math.random();
+      return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  }
+
+  function stepMCMC() {
+      proposedX = currentX + randomNormal() * proposalSigma;
+      proposedY = currentY + randomNormal() * proposalSigma;
+      
+      const pCurrent = targetPDF(currentX, currentY);
+      const pProposed = targetPDF(proposedX, proposedY);
+      const acceptanceRatio = pProposed / pCurrent;
+      
+      totalAttempts++;
+      
+      if (Math.random() < acceptanceRatio) {
+          currentX = proposedX;
+          currentY = proposedY;
+          totalAccepts++;
+          proposalAccepted = true;
+      } else {
+          proposalAccepted = false;
+      }
+      
+      samples.push({x: currentX, y: currentY});
+
+      let idxX = Math.floor((currentX + 3) / 6 * numBins);
+      if (idxX >= 0 && idxX < numBins) binsX[idxX]++;
+      
+      let idxY = Math.floor((currentY + 3) / 6 * numBins);
+      if (idxY >= 0 && idxY < numBins) binsY[idxY]++;
+  }
+
+  function drawChains() {
+      const historyLen = 150;
+      const startIdx = Math.max(0, samples.length - historyLen);
+      const visibleSamples = samples.slice(startIdx);
+      
+      // Draw Chain X (Top - mu)
+      ctx.strokeStyle = '#3f3f46';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(CHAIN_X_START, CHAIN_Y1_START, CHAIN_WIDTH, CHAIN_HEIGHT);
+      
+      // Zero line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(CHAIN_X_START, CHAIN_Y1_START + CHAIN_HEIGHT / 2);
+      ctx.lineTo(CHAIN_X_START + CHAIN_WIDTH, CHAIN_Y1_START + CHAIN_HEIGHT / 2);
+      ctx.stroke();
+      
+      // Label
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '11px monospace';
+      ctx.fillText('Trace X', CHAIN_X_START, CHAIN_Y1_START - 8);
+      
+      if (visibleSamples.length > 0) {
+          ctx.strokeStyle = '#818cf8'; // Indigo
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          for (let i = 0; i < visibleSamples.length; i++) {
+              const cx = CHAIN_X_START + (i / (historyLen - 1)) * CHAIN_WIDTH;
+              const cy = CHAIN_Y1_START + CHAIN_HEIGHT / 2 - (visibleSamples[i].x * (CHAIN_HEIGHT / 6));
+              if (i === 0) ctx.moveTo(cx, cy);
+              else ctx.lineTo(cx, cy);
+          }
+          ctx.stroke();
+      }
+
+      // Draw Chain Y (Bottom - beta)
+      ctx.strokeStyle = '#3f3f46';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(CHAIN_X_START, CHAIN_Y2_START, CHAIN_WIDTH, CHAIN_HEIGHT);
+      
+      // Zero line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(CHAIN_X_START, CHAIN_Y2_START + CHAIN_HEIGHT / 2);
+      ctx.lineTo(CHAIN_X_START + CHAIN_WIDTH, CHAIN_Y2_START + CHAIN_HEIGHT / 2);
+      ctx.stroke();
+      
+      // Label
+      ctx.fillStyle = '#a1a1aa';
+      ctx.font = '11px monospace';
+      ctx.fillText('Trace Y', CHAIN_X_START, CHAIN_Y2_START - 8);
+      
+      if (visibleSamples.length > 0) {
+          ctx.strokeStyle = '#f472b6'; // Pink
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          for (let i = 0; i < visibleSamples.length; i++) {
+              const cx = CHAIN_X_START + (i / (historyLen - 1)) * CHAIN_WIDTH;
+              const cy = CHAIN_Y2_START + CHAIN_HEIGHT / 2 - (visibleSamples[i].y * (CHAIN_HEIGHT / 6));
+              if (i === 0) ctx.moveTo(cx, cy);
+              else ctx.lineTo(cx, cy);
+          }
+          ctx.stroke();
+      }
+  }
+
+  function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      ctx.drawImage(bgCanvas, PAD_LEFT, PAD_TOP);
+      
+      ctx.strokeStyle = '#3f3f46';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(PAD_LEFT, PAD_TOP, MAIN_SIZE, MAIN_SIZE);
+      
+      ctx.fillStyle = 'rgba(165, 180, 252, 0.22)'; 
+      for(let i = 0; i < samples.length; i++) {
+          ctx.fillRect(toCanvasX(samples[i].x), toCanvasY(samples[i].y), 1.5, 1.5);
+      }
+      
+      if (proposedX !== null) {
+          ctx.beginPath();
+          const prevX = proposalAccepted ? samples[samples.length-2]?.x || currentX : currentX;
+          const prevY = proposalAccepted ? samples[samples.length-2]?.y || currentY : currentY;
+          
+          ctx.moveTo(toCanvasX(prevX), toCanvasY(prevY));
+          ctx.lineTo(toCanvasX(proposedX), toCanvasY(proposedY));
+          ctx.lineWidth = 1.8;
+          ctx.strokeStyle = proposalAccepted ? '#10b981' : '#ef4444';
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.arc(toCanvasX(proposedX), toCanvasY(proposedY), 3.5, 0, 2 * Math.PI);
+          ctx.fillStyle = proposalAccepted ? '#10b981' : '#ef4444';
+          ctx.fill();
+      }
+      
+      ctx.beginPath();
+      ctx.arc(toCanvasX(currentX), toCanvasY(currentY), 5.5, 0, 2 * Math.PI);
+      ctx.fillStyle = '#6366f1';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2;
+      ctx.fill();
+      ctx.stroke();
+      
+      // X Histograms (Top Panel)
+      const maxBinX = Math.max(...binsX, 1);
+      const binW = MAIN_SIZE / numBins;
+      ctx.fillStyle = 'rgba(99, 102, 241, 0.35)';
+      for (let i = 0; i < numBins; i++) {
+          const cx = PAD_LEFT + i * binW;
+          const barHeight = (binsX[i] / maxBinX) * (MARGIN_PANEL_SIZE - 10);
+          const cy = (PAD_TOP - 15) - barHeight;
+          ctx.fillRect(cx, cy, binW - 1, barHeight);
+      }
+      
+      // X Analytical Curve
+      ctx.beginPath();
+      for (let i = 0; i <= MAIN_SIZE; i++) {
+          const cx = PAD_LEFT + i;
+          const x = (i / MAIN_SIZE) * 6 - 3;
+          const density = Math.exp(-0.32 * x * x);
+          const cy = (PAD_TOP - 15) - density * (MARGIN_PANEL_SIZE - 10);
+          if (i === 0) ctx.moveTo(cx, cy);
+          else ctx.lineTo(cx, cy);
+      }
+      ctx.strokeStyle = '#6366f1';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Y Histograms (Right Panel)
+      const maxBinY = Math.max(...binsY, 1);
+      const binH = MAIN_SIZE / numBins;
+      ctx.fillStyle = 'rgba(99, 102, 241, 0.35)';
+      for (let i = 0; i < numBins; i++) {
+          const cy = PAD_TOP + MAIN_SIZE - (i + 1) * binH;
+          const barWidth = (binsY[i] / maxBinY) * (MARGIN_PANEL_SIZE - 10);
+          const cx = PAD_LEFT + MAIN_SIZE + 15;
+          ctx.fillRect(cx, cy, barWidth, binH - 1);
+      }
+      
+      // Y Analytical Curve
+      ctx.beginPath();
+      for (let i = 0; i <= MAIN_SIZE; i++) {
+          const cy = PAD_TOP + i;
+          const y = 3 - (i / MAIN_SIZE) * 6;
+          const density = Math.exp(-0.32 * y * y);
+          const cx = (PAD_LEFT + MAIN_SIZE + 15) + density * (MARGIN_PANEL_SIZE - 10);
+          if (i === 0) ctx.moveTo(cx, cy);
+          else ctx.lineTo(cx, cy);
+      }
+      ctx.strokeStyle = '#6366f1';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Draw scrolling MCMC parameter chains
+      drawChains();
+      
+      totalSamplesEl.textContent = samples.length;
+      const rate = totalAttempts > 0 ? ((totalAccepts / totalAttempts) * 100).toFixed(1) : 0;
+      accRateEl.textContent = `${rate}%`;
+  }
+
+  let animationId = null;
+  function animationLoop() {
+      frameCounter++;
+      const val = speedSlider ? parseInt(speedSlider.value) : 35;
+      
+      if (val <= 40) {
+          const framesPerStep = 41 - val;
+          if (frameCounter % framesPerStep === 0) {
+              stepMCMC();
+          }
+      } else {
+          const stepsPerFrame = Math.round((val - 40) * 1.25) + 1;
+          for(let i = 0; i < stepsPerFrame; i++) {
+              stepMCMC();
+          }
+      }
+      draw();
+      animationId = requestAnimationFrame(animationLoop);
+  }
+
+  animationLoop();
+  
+  canvas.addEventListener('remove', function() {
+      if (animationId) cancelAnimationFrame(animationId);
+  });
+})();
+</script>
+</section>
+<section id="modern-mcmc-algorithms" class="slide level2">
+<h2>Modern MCMC algorithms</h2>
+<ul>
+<li class="fragment">Modern MCMC algorithms, such as Hamiltonian Monte Carlo (HMC) and its variant No-U-Turn Sampler (NUTS), are more efficient than the basic Metropolis-Hastings algorithm. They can explore the parameter space more effectively and converge faster.</li>
+</ul>
+</section>
+<section id="prior-specification" class="slide level2">
+<h2>Prior Specification</h2>
+<p>Bayesian inference combines our <strong>Priors</strong> (prior beliefs about parameter scales) and <strong>Likelihood</strong> (observed data) to calculate the <strong>Posterior</strong> distribution.</p>
+<div style="font-size: 65%;">
+<p>We can use the following types of priors:</p>
+<ul>
+<li class="fragment"><strong>Uninformative priors:</strong> Priors that do not provide any information about the parameters (e.g., uniform distribution). <code>brms</code> will use these by default for coefficents if no other prior is specified. These priors sound “objective”, but they are actually extremely unrealistic since they consider an effect size of 100000 ms to be equally likely as 10 ms.
+<ul>
+<li class="fragment">The sampler may have to explore a very wide parameter space, which can lead to convergence issues and inefficient sampling.</li>
+</ul></li>
+<li class="fragment"><strong>Weakly informative/regularizing priors:</strong> These priors are centered on 0, but exclude impossible and improbable values. These priors do not need to be narrow – even setting the widest range of parameters you would possibly consider helps the sampler avoid getting stuck.
+<ul>
+<li class="fragment">For example: From other studies, I think the discordant flanker might slow participants down somewhere between 0 and 50 ms compared to the congruent condition. Since I want to be particularly careful, I set a normal prior with mean 0 and SD 100 ms, which allows for a wide range of plausible effects (even in the opposite direction) but excludes extreme effects such as a differences of 10 s or more. Even with a moderate amount of observations in your data the exact width of the prior usually does not matter since the prior is easily overwhelmed by the observed data.</li>
+</ul></li>
+<li class="fragment"><strong>Strongly informative priors</strong>: These have a mean that is different from 0. You could use these if you are very confident about the direction and size of the effect based on previous research. However, these priors can be controversial and should be used with caution, as they can heavily influence the posterior distribution and may lead to biased results if the prior information is incorrect.</li>
+</ul>
+</div>
+</section>
+<section id="priors-for-coefficients-class-b" class="slide level2">
+<h2>Priors for Coefficients (<code>class = "b"</code>)</h2>
+<div class="columns">
+<div class="column" style="width:60%;">
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="session-2-brms_files/figure-revealjs/plot-coef-prior-1.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
+</figure>
+</div>
+</div>
+</div>
+</div><div class="column" style="width:40%;">
+<div style="font-size: 65%;">
+<p><strong>Default Prior:</strong></p>
+<ul>
+<li class="fragment">Flat prior allows <strong>absurdly huge values</strong> (e.g.&nbsp;slowing down by 1000s).</li>
+<li class="fragment">Can cause convergence issues as the sampler wastes time in impossible regions.</li>
+</ul>
+<p><strong>Recommended Prior:</strong></p>
+<ul>
+<li class="fragment"><strong>Normal(0, 0.1)</strong> (100 ms SD) on raw RT.</li>
+<li class="fragment">Restricts effects to plausible scales while being wide enough to let data speak.</li>
+<li class="fragment">center at 0 represents the conservative null hypothesis (shrinkage).</li>
+</ul>
+</div>
+</div></div>
+<ul>
+<li class="fragment">Pick a prior that is appropriate for your effect size!</li>
+</ul>
+</section>
+<section id="priors-for-group-level-sds-class-sd" class="slide level2">
+<h2>Priors for Group-Level SDs (<code>class = "sd"</code>)</h2>
+<div class="columns">
+<div class="column" style="width:60%;">
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="session-2-brms_files/figure-revealjs/plot-sd-prior-1.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
+</figure>
+</div>
+</div>
+</div>
+</div><div class="column" style="width:40%;">
+<div style="font-size: 60%;">
+<p><strong>Default Prior:</strong></p>
+<ul>
+<li class="fragment"><strong>Half-Student-t(3, 0, 2.5)</strong>.</li>
+<li class="fragment">Heavy tail accommodates very large standard deviations easily.</li>
+<li class="fragment">Less regularizing if data is sparse or structure is complex.</li>
+</ul>
+<p><strong>Recommended Prior:</strong></p>
+<ul>
+<li class="fragment"><strong>Exponential(2)</strong> (mean = 0.5s).</li>
+<li class="fragment">Mode at 0 provides <strong>shrinkage</strong> toward 0 unless supported by data.</li>
+<li class="fragment"><strong>Prevents singular fits</strong> and stabilizes sampling.</li>
+<li class="fragment"><em>Scaling Note:</em> Exponential priors <strong>must be scaled</strong> to your DV’s measurement scale! <code>exponential(2)</code> (mean = 0.5s) works for RT in seconds. For milliseconds, scale the rate accordingly (e.g.&nbsp;<code>exponential(0.002)</code> for a 500 ms mean).</li>
+</ul>
+</div>
+</div></div>
+<div class="accent-box">
+<p><strong>Rule of Thumb:</strong> When in doubt, use the default priors, <strong>except</strong> for fixed effect coefficients (where you should always specify a regularizing prior like <code>normal</code>).</p>
+</div>
+</section>
+<section id="priors-for-group-correlations-class-cor" class="slide level2">
+<h2>Priors for Group Correlations (<code>class = "cor"</code>)</h2>
+<div class="columns">
+<div class="column" style="width:60%;">
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="session-2-brms_files/figure-revealjs/plot-cor-prior-1.png" class="quarto-figure quarto-figure-center" style="width:100.0%"></p>
+</figure>
+</div>
+</div>
+</div>
+</div><div class="column" style="width:40%;">
+<div style="font-size: 65%;">
+<p><strong>Default Prior:</strong></p>
+<ul>
+<li class="fragment"><strong>LKJ(1)</strong> prior.</li>
+<li class="fragment">Completely uniform over correlation matrices.</li>
+<li class="fragment">Highly extreme correlation values like <span class="math inline">\(\pm 0.99\)</span> are just as likely as 0.</li>
+</ul>
+<p><strong>Recommended Prior:</strong></p>
+<ul>
+<li class="fragment"><strong>LKJ(2)</strong> prior (or larger, e.g., LKJ(4)).</li>
+<li class="fragment">Parabolic density shape centered at 0.</li>
+<li class="fragment"><strong>Shrinks correlation estimates toward zero</strong>, preventing over-fitting and stabilizing random slope-intercept covariance structures.</li>
+</ul>
+</div>
+</div></div>
+</section>
+<section id="modeling-response-times-with-the-gaussian-distribution" class="slide level2 dark-bg" data-background-color="#C2002F">
+<h2>Modeling response times with the Gaussian distribution</h2>
+</section>
+<section id="fit-the-model-with-brms" class="slide level2">
+<h2>Fit the model with <code>brms</code></h2>
+<p>To transition from Frequentist LMMs (<code>lme4</code>) to Bayesian LMMs (<code>brms</code>), we can fit an identical formula structure using a Gaussian family.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href=""></a><span class="fu">library</span>(brms)</span>
+<span id="cb1-2"><a href=""></a><span class="fu">library</span>(here)</span>
+<span id="cb1-3"><a href=""></a></span>
+<span id="cb1-4"><a href=""></a><span class="co"># Same formula and contrasts as lme4 model</span></span>
+<span id="cb1-5"><a href=""></a>fit_gaussian <span class="ot">&lt;-</span> <span class="fu">brm</span>(</span>
+<span id="cb1-6"><a href=""></a>  <span class="at">formula =</span> rt <span class="sc">~</span> Condition <span class="sc">*</span> StimulusType <span class="sc">+</span> </span>
+<span id="cb1-7"><a href=""></a>    (Condition <span class="sc">*</span> StimulusType <span class="sc">|</span> subject) <span class="sc">+</span> </span>
+<span id="cb1-8"><a href=""></a>    (Condition <span class="sc">|</span> item),</span>
+<span id="cb1-9"><a href=""></a>  <span class="at">data =</span> flanker_sub,</span>
+<span id="cb1-10"><a href=""></a>  <span class="at">family =</span> <span class="fu">gaussian</span>(),</span>
+<span id="cb1-11"><a href=""></a>  <span class="at">prior =</span> priors_gaussian,</span>
+<span id="cb1-12"><a href=""></a>  <span class="at">sample_prior =</span> <span class="st">"yes"</span>, <span class="co"># this is important if you want to get Bayes factors later</span></span>
+<span id="cb1-13"><a href=""></a>  <span class="at">chains =</span> <span class="dv">4</span>, <span class="at">iter =</span> <span class="dv">2000</span>, <span class="at">warmup =</span> <span class="dv">1000</span>,</span>
+<span id="cb1-14"><a href=""></a>  <span class="at">cores =</span> <span class="dv">4</span>, <span class="at">backend =</span> <span class="st">"cmdstanr"</span>,</span>
+<span id="cb1-15"><a href=""></a>  <span class="co"># if you have enough processor cores, you can speed up the model by using 2 or more cores per chain</span></span>
+<span id="cb1-16"><a href=""></a>  <span class="co"># this has diminishing returns -- 2 cores won't be twice as fast as one</span></span>
+<span id="cb1-17"><a href=""></a>  <span class="at">threads =</span> <span class="fu">threading</span>(<span class="dv">2</span>)</span>
+<span id="cb1-18"><a href=""></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="accent-box">
+<p>Unlike <code>lme4</code>, <code>brms</code> will compute the full joint posterior distribution using MCMC (Hamiltonian Monte Carlo / NUTS) instead of estimating a single point (Maximum Likelihood).</p>
+</div>
+</section>
+<section id="what-do-we-need-to-fit-a-model-with-brms" class="slide level2">
+<h2>What do we need to fit a model with brms?</h2>
+<ul>
+<li class="fragment"><strong>Model Formula:</strong> Same as <code>lme4</code>, but we can also specify more complex structures.</li>
+<li class="fragment"><strong>Data:</strong> Same as <code>lme4</code>. A data frame with all the variables used in the formula.</li>
+<li class="fragment"><strong>Priors:</strong> We need to specify prior distributions for all our parameters. This is necessary in Bayesian statistics. <code>brms</code> has default priors that it uses if no prior is specified.</li>
+</ul>
+</section>
+<section id="specifying-priors" class="slide level2">
+<h2>Specifying Priors</h2>
+<p>Before running the model, we define regularizing priors to restrict parameters to physiologically plausible bounds and prevent singular fits:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href=""></a>priors_gaussian <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb2-2"><a href=""></a>  <span class="co"># you should set a prior for fixed effects</span></span>
+<span id="cb2-3"><a href=""></a>  <span class="fu">prior</span>(<span class="fu">normal</span>(<span class="dv">0</span>, <span class="fl">0.1</span>), <span class="at">class =</span> <span class="st">"b"</span>), <span class="co"># this is our N(0,1) prior (100 ms SD)          </span></span>
+<span id="cb2-4"><a href=""></a>  <span class="co"># these are optional, the brms priors usually work well</span></span>
+<span id="cb2-5"><a href=""></a>  <span class="fu">prior</span>(<span class="fu">exponential</span>(<span class="dv">2</span>), <span class="at">class =</span> <span class="st">"sd"</span>),          <span class="co"># group-level SD variation</span></span>
+<span id="cb2-6"><a href=""></a>  <span class="fu">prior</span>(<span class="fu">lkj</span>(<span class="dv">2</span>), <span class="at">class =</span> <span class="st">"cor"</span>)                  <span class="co"># correlation matrix prior</span></span>
+<span id="cb2-7"><a href=""></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="accent-box">
+<p>When in doubt, use the default priors, <strong>except</strong> for fixed effect coefficients (where you should always specify a regularizing prior like <code>normal(0, 0.1)</code>).</p>
+</div>
+</section>
+<section id="model-output-summary" class="slide level2">
+<h2>Model Output: Summary</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href=""></a><span class="fu">summary</span>(fit_gaussian)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> Family: gaussian 
+  Links: mu = identity 
+Formula: rt ~ Condition * StimulusType + (Condition * StimulusType | subject) + (Condition | item) 
+   Data: flanker_rt_data (Number of observations: 44739) 
+  Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 4000
+
+Multilevel Hyperparameters:
+~item (Number of levels: 450) 
+                                                 Estimate Est.Error l-95% CI
+sd(Intercept)                                        0.03      0.00     0.02
+sd(ConditionCON_vs_AGR)                              0.01      0.00     0.00
+sd(ConditionCON_AGR_vs_DIS)                          0.01      0.00     0.01
+cor(Intercept,ConditionCON_vs_AGR)                   0.49      0.23    -0.01
+cor(Intercept,ConditionCON_AGR_vs_DIS)              -0.59      0.13    -0.84
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS)    -0.35      0.31    -0.86
+                                                 u-95% CI Rhat Bulk_ESS
+sd(Intercept)                                        0.03 1.01     1532
+sd(ConditionCON_vs_AGR)                              0.01 1.00     1161
+sd(ConditionCON_AGR_vs_DIS)                          0.02 1.00     1363
+cor(Intercept,ConditionCON_vs_AGR)                   0.87 1.00     2671
+cor(Intercept,ConditionCON_AGR_vs_DIS)              -0.34 1.00     1651
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS)     0.33 1.00      578
+                                                 Tail_ESS
+sd(Intercept)                                        2593
+sd(ConditionCON_vs_AGR)                              1224
+sd(ConditionCON_AGR_vs_DIS)                          2149
+cor(Intercept,ConditionCON_vs_AGR)                   2281
+cor(Intercept,ConditionCON_AGR_vs_DIS)               1810
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS)     1294
+
+~subject (Number of levels: 109) 
+                                                                             Estimate
+sd(Intercept)                                                                    0.09
+sd(ConditionCON_vs_AGR)                                                          0.00
+sd(ConditionCON_AGR_vs_DIS)                                                      0.03
+sd(StimulusType1)                                                                0.01
+sd(ConditionCON_vs_AGR:StimulusType1)                                            0.00
+sd(ConditionCON_AGR_vs_DIS:StimulusType1)                                        0.00
+cor(Intercept,ConditionCON_vs_AGR)                                              -0.13
+cor(Intercept,ConditionCON_AGR_vs_DIS)                                          -0.54
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS)                                -0.03
+cor(Intercept,StimulusType1)                                                     0.03
+cor(ConditionCON_vs_AGR,StimulusType1)                                          -0.06
+cor(ConditionCON_AGR_vs_DIS,StimulusType1)                                      -0.23
+cor(Intercept,ConditionCON_vs_AGR:StimulusType1)                                 0.06
+cor(ConditionCON_vs_AGR,ConditionCON_vs_AGR:StimulusType1)                      -0.07
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_vs_AGR:StimulusType1)                   0.02
+cor(StimulusType1,ConditionCON_vs_AGR:StimulusType1)                             0.12
+cor(Intercept,ConditionCON_AGR_vs_DIS:StimulusType1)                             0.25
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS:StimulusType1)                  -0.04
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_AGR_vs_DIS:StimulusType1)              -0.11
+cor(StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)                        -0.11
+cor(ConditionCON_vs_AGR:StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)     0.06
+                                                                             Est.Error
+sd(Intercept)                                                                     0.01
+sd(ConditionCON_vs_AGR)                                                           0.00
+sd(ConditionCON_AGR_vs_DIS)                                                       0.00
+sd(StimulusType1)                                                                 0.00
+sd(ConditionCON_vs_AGR:StimulusType1)                                             0.00
+sd(ConditionCON_AGR_vs_DIS:StimulusType1)                                         0.00
+cor(Intercept,ConditionCON_vs_AGR)                                                0.30
+cor(Intercept,ConditionCON_AGR_vs_DIS)                                            0.08
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS)                                  0.29
+cor(Intercept,StimulusType1)                                                      0.11
+cor(ConditionCON_vs_AGR,StimulusType1)                                            0.30
+cor(ConditionCON_AGR_vs_DIS,StimulusType1)                                        0.11
+cor(Intercept,ConditionCON_vs_AGR:StimulusType1)                                  0.29
+cor(ConditionCON_vs_AGR,ConditionCON_vs_AGR:StimulusType1)                        0.33
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_vs_AGR:StimulusType1)                    0.29
+cor(StimulusType1,ConditionCON_vs_AGR:StimulusType1)                              0.31
+cor(Intercept,ConditionCON_AGR_vs_DIS:StimulusType1)                              0.28
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS:StimulusType1)                    0.33
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_AGR_vs_DIS:StimulusType1)                0.29
+cor(StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)                          0.28
+cor(ConditionCON_vs_AGR:StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)      0.33
+                                                                             l-95% CI
+sd(Intercept)                                                                    0.08
+sd(ConditionCON_vs_AGR)                                                          0.00
+sd(ConditionCON_AGR_vs_DIS)                                                      0.03
+sd(StimulusType1)                                                                0.01
+sd(ConditionCON_vs_AGR:StimulusType1)                                            0.00
+sd(ConditionCON_AGR_vs_DIS:StimulusType1)                                        0.00
+cor(Intercept,ConditionCON_vs_AGR)                                              -0.67
+cor(Intercept,ConditionCON_AGR_vs_DIS)                                          -0.68
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS)                                -0.57
+cor(Intercept,StimulusType1)                                                    -0.17
+cor(ConditionCON_vs_AGR,StimulusType1)                                          -0.63
+cor(ConditionCON_AGR_vs_DIS,StimulusType1)                                      -0.44
+cor(Intercept,ConditionCON_vs_AGR:StimulusType1)                                -0.54
+cor(ConditionCON_vs_AGR,ConditionCON_vs_AGR:StimulusType1)                      -0.69
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_vs_AGR:StimulusType1)                  -0.56
+cor(StimulusType1,ConditionCON_vs_AGR:StimulusType1)                            -0.51
+cor(Intercept,ConditionCON_AGR_vs_DIS:StimulusType1)                            -0.38
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS:StimulusType1)                  -0.66
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_AGR_vs_DIS:StimulusType1)              -0.65
+cor(StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)                        -0.61
+cor(ConditionCON_vs_AGR:StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)    -0.58
+                                                                             u-95% CI
+sd(Intercept)                                                                    0.10
+sd(ConditionCON_vs_AGR)                                                          0.01
+sd(ConditionCON_AGR_vs_DIS)                                                      0.04
+sd(StimulusType1)                                                                0.02
+sd(ConditionCON_vs_AGR:StimulusType1)                                            0.01
+sd(ConditionCON_AGR_vs_DIS:StimulusType1)                                        0.01
+cor(Intercept,ConditionCON_vs_AGR)                                               0.52
+cor(Intercept,ConditionCON_AGR_vs_DIS)                                          -0.37
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS)                                 0.54
+cor(Intercept,StimulusType1)                                                     0.24
+cor(ConditionCON_vs_AGR,StimulusType1)                                           0.54
+cor(ConditionCON_AGR_vs_DIS,StimulusType1)                                      -0.01
+cor(Intercept,ConditionCON_vs_AGR:StimulusType1)                                 0.61
+cor(ConditionCON_vs_AGR,ConditionCON_vs_AGR:StimulusType1)                       0.58
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_vs_AGR:StimulusType1)                   0.59
+cor(StimulusType1,ConditionCON_vs_AGR:StimulusType1)                             0.67
+cor(Intercept,ConditionCON_AGR_vs_DIS:StimulusType1)                             0.73
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS:StimulusType1)                   0.60
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_AGR_vs_DIS:StimulusType1)               0.51
+cor(StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)                         0.46
+cor(ConditionCON_vs_AGR:StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)     0.65
+                                                                             Rhat
+sd(Intercept)                                                                1.00
+sd(ConditionCON_vs_AGR)                                                      1.00
+sd(ConditionCON_AGR_vs_DIS)                                                  1.00
+sd(StimulusType1)                                                            1.00
+sd(ConditionCON_vs_AGR:StimulusType1)                                        1.00
+sd(ConditionCON_AGR_vs_DIS:StimulusType1)                                    1.00
+cor(Intercept,ConditionCON_vs_AGR)                                           1.00
+cor(Intercept,ConditionCON_AGR_vs_DIS)                                       1.00
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS)                             1.02
+cor(Intercept,StimulusType1)                                                 1.00
+cor(ConditionCON_vs_AGR,StimulusType1)                                       1.06
+cor(ConditionCON_AGR_vs_DIS,StimulusType1)                                   1.00
+cor(Intercept,ConditionCON_vs_AGR:StimulusType1)                             1.00
+cor(ConditionCON_vs_AGR,ConditionCON_vs_AGR:StimulusType1)                   1.00
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_vs_AGR:StimulusType1)               1.00
+cor(StimulusType1,ConditionCON_vs_AGR:StimulusType1)                         1.00
+cor(Intercept,ConditionCON_AGR_vs_DIS:StimulusType1)                         1.00
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS:StimulusType1)               1.00
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_AGR_vs_DIS:StimulusType1)           1.00
+cor(StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)                     1.00
+cor(ConditionCON_vs_AGR:StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1) 1.00
+                                                                             Bulk_ESS
+sd(Intercept)                                                                     315
+sd(ConditionCON_vs_AGR)                                                          1139
+sd(ConditionCON_AGR_vs_DIS)                                                      1747
+sd(StimulusType1)                                                                1935
+sd(ConditionCON_vs_AGR:StimulusType1)                                            1303
+sd(ConditionCON_AGR_vs_DIS:StimulusType1)                                        1323
+cor(Intercept,ConditionCON_vs_AGR)                                               6404
+cor(Intercept,ConditionCON_AGR_vs_DIS)                                           1476
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS)                                  178
+cor(Intercept,StimulusType1)                                                     2299
+cor(ConditionCON_vs_AGR,StimulusType1)                                             85
+cor(ConditionCON_AGR_vs_DIS,StimulusType1)                                       1529
+cor(Intercept,ConditionCON_vs_AGR:StimulusType1)                                 6631
+cor(ConditionCON_vs_AGR,ConditionCON_vs_AGR:StimulusType1)                       3147
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_vs_AGR:StimulusType1)                   6138
+cor(StimulusType1,ConditionCON_vs_AGR:StimulusType1)                             4680
+cor(Intercept,ConditionCON_AGR_vs_DIS:StimulusType1)                             5345
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS:StimulusType1)                   3200
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_AGR_vs_DIS:StimulusType1)               6287
+cor(StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)                         5899
+cor(ConditionCON_vs_AGR:StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)     2690
+                                                                             Tail_ESS
+sd(Intercept)                                                                     562
+sd(ConditionCON_vs_AGR)                                                          2269
+sd(ConditionCON_AGR_vs_DIS)                                                      2629
+sd(StimulusType1)                                                                2900
+sd(ConditionCON_vs_AGR:StimulusType1)                                            2278
+sd(ConditionCON_AGR_vs_DIS:StimulusType1)                                        1681
+cor(Intercept,ConditionCON_vs_AGR)                                               2104
+cor(Intercept,ConditionCON_AGR_vs_DIS)                                           2146
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS)                                  466
+cor(Intercept,StimulusType1)                                                     2711
+cor(ConditionCON_vs_AGR,StimulusType1)                                            171
+cor(ConditionCON_AGR_vs_DIS,StimulusType1)                                       2760
+cor(Intercept,ConditionCON_vs_AGR:StimulusType1)                                 3056
+cor(ConditionCON_vs_AGR,ConditionCON_vs_AGR:StimulusType1)                       3004
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_vs_AGR:StimulusType1)                   2357
+cor(StimulusType1,ConditionCON_vs_AGR:StimulusType1)                             2852
+cor(Intercept,ConditionCON_AGR_vs_DIS:StimulusType1)                             2398
+cor(ConditionCON_vs_AGR,ConditionCON_AGR_vs_DIS:StimulusType1)                   3175
+cor(ConditionCON_AGR_vs_DIS,ConditionCON_AGR_vs_DIS:StimulusType1)               2730
+cor(StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)                         2874
+cor(ConditionCON_vs_AGR:StimulusType1,ConditionCON_AGR_vs_DIS:StimulusType1)     2958
+
+Regression Coefficients:
+                                      Estimate Est.Error l-95% CI u-95% CI Rhat
+Intercept                                 0.51      0.01     0.49     0.52 1.02
+ConditionCON_vs_AGR                      -0.00      0.00    -0.01     0.00 1.00
+ConditionCON_AGR_vs_DIS                  -0.05      0.00    -0.06    -0.04 1.00
+StimulusType1                             0.01      0.00     0.00     0.01 1.00
+ConditionCON_vs_AGR:StimulusType1         0.00      0.00    -0.00     0.00 1.00
+ConditionCON_AGR_vs_DIS:StimulusType1     0.00      0.00    -0.00     0.00 1.00
+                                      Bulk_ESS Tail_ESS
+Intercept                                  135      214
+ConditionCON_vs_AGR                       4482     2892
+ConditionCON_AGR_vs_DIS                    538     1338
+StimulusType1                             1946     2586
+ConditionCON_vs_AGR:StimulusType1         4064     2672
+ConditionCON_AGR_vs_DIS:StimulusType1     4003     2900
+
+Further Distributional Parameters:
+      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sigma     0.15      0.00     0.15     0.15 1.00     9430     2566
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).</code></pre>
+</div>
+</div>
+</section>
+<section id="interpretation-of-the-gaussian-lmm-output" class="slide level2">
+<h2>Interpretation of the Gaussian LMM Output</h2>
+<div style="font-size: 65%;">
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 12%">
+<col style="width: 13%">
+<col style="width: 12%">
+<col style="width: 12%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: right;">Estimate</th>
+<th style="text-align: right;">Est.Error</th>
+<th style="text-align: right;">l-95% CI</th>
+<th style="text-align: right;">u-95% CI</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Intercept</td>
+<td style="text-align: right;">0.507</td>
+<td style="text-align: right;">0.009</td>
+<td style="text-align: right;">0.489</td>
+<td style="text-align: right;">0.524</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ConditionCON_vs_AGR</td>
+<td style="text-align: right;">-0.004</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">-0.007</td>
+<td style="text-align: right;">0.000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ConditionCON_AGR_vs_DIS</td>
+<td style="text-align: right;">-0.052</td>
+<td style="text-align: right;">0.004</td>
+<td style="text-align: right;">-0.059</td>
+<td style="text-align: right;">-0.045</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">StimulusType1</td>
+<td style="text-align: right;">0.006</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">0.010</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ConditionCON_vs_AGR:StimulusType1</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">-0.003</td>
+<td style="text-align: right;">0.004</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ConditionCON_AGR_vs_DIS:StimulusType1</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">-0.002</td>
+<td style="text-align: right;">0.004</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<ul>
+<li class="fragment">The <strong>Intercept</strong> (baseline RT) is estimated at 0.51s.</li>
+<li class="fragment">Results are largely similar to the <code>lme4</code> model, but now we have <strong>credible intervals</strong> instead of confidence intervals.</li>
+</ul>
+</section>
+<section id="interpreting-posterior-distributions" class="slide level2">
+<h2>Interpreting Posterior Distributions</h2>
+<p>Unlike frequentist point estimates, Bayesian inference gives us a <strong>full probability distribution</strong> (the posterior) for each parameter. We can interpret this distribution in several intuitive ways:</p>
+<div style="font-size: 70%;">
+<ul>
+<li class="fragment"><strong>1. Credible Intervals (CI):</strong>
+<ul>
+<li class="fragment">Defines the range in which the true parameter value lies with a specific probability (e.g., 95%), given the data and priors.</li>
+<li class="fragment">If the interval excludes 0, we have strong evidence of an effect.</li>
+</ul></li>
+<li class="fragment"><strong>2. Probability of Direction (<span class="math inline">\(pd\)</span>):</strong>
+<ul>
+<li class="fragment">The proportion of the posterior distribution that lies on one side of 0 (has the same sign as the mean).</li>
+<li class="fragment">Represents the direct probability that an effect is positive or negative.</li>
+</ul></li>
+<li class="fragment"><strong>3. Bayes Factors (BF):</strong>
+<ul>
+<li class="fragment">Quantifies the relative evidence that the data provides for the alternative hypothesis (<span class="math inline">\(H_1\)</span>) vs.&nbsp;the null hypothesis (<span class="math inline">\(H_0\)</span>).</li>
+</ul></li>
+</ul>
+</div>
+</section>
+<section id="interpreting-credible-intervals-agrcon-vs.-dis" class="slide level2">
+<h2>1. Interpreting Credible Intervals: AGR/CON vs.&nbsp;DIS</h2>
+<p>To test if the discordant flanker condition (<code>DIS</code>) slows down reaction times compared to the average of congruent and control conditions (<code>CON</code> and <code>AGR</code>), we check the posterior credible interval for: <span class="math display">\[\beta_{\text{CON_AGR_vs_DIS}} = \frac{\text{CON} + \text{AGR}}{2} - \text{DIS}\]</span></p>
+<section id="extracting-credible-intervals-in-r" class="accent-box">
+<h3>Extracting Credible Intervals in R</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href=""></a><span class="co"># Extract the coefficient summary from fit_gaussian</span></span>
+<span id="cb5-2"><a href=""></a>coef_summary <span class="ot">&lt;-</span> <span class="fu">summary</span>(fit_gaussian)<span class="sc">$</span>fixed[<span class="st">"ConditionCON_AGR_vs_DIS"</span>, ]</span>
+<span id="cb5-3"><a href=""></a><span class="fu">print</span>(<span class="fu">round</span>(coef_summary[<span class="fu">c</span>(<span class="st">"Estimate"</span>, <span class="st">"Est.Error"</span>, <span class="st">"l-95% CI"</span>, <span class="st">"u-95% CI"</span>)], <span class="dv">4</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                        Estimate Est.Error l-95% CI u-95% CI
+ConditionCON_AGR_vs_DIS  -0.0518    0.0036   -0.059  -0.0446</code></pre>
+</div>
+</div>
+</section>
+<div style="font-size: 65%;">
+<ul>
+<li class="fragment"><strong>Key Interpretation:</strong>
+<ul>
+<li class="fragment">The 95% Credible Interval ranges from <strong>-59 ms</strong> to <strong>-44.6 ms</strong>.</li>
+<li class="fragment">Since the interval <strong>does not contain 0</strong>, we have strong evidence that the effect exists.</li>
+<li class="fragment">There is a <strong>95% probability</strong> that the true difference is between -59 ms and -44.6 ms (conditioned on our data and priors).</li>
+</ul></li>
+</ul>
+</div>
+</section>
+<section id="probability-of-direction-pd-agrcon-vs.-dis" class="slide level2">
+<h2>2. Probability of Direction (<span class="math inline">\(pd\)</span>): AGR/CON vs.&nbsp;DIS</h2>
+<p>Rather than a binary “significant / not significant” decision, we can calculate the exact probability that the interference effect is negative (i.e., that <code>DIS</code> is slower than <code>AGR/CON</code>).</p>
+<h3 id="calculating-pd-from-mcmc-draws-in-r">Calculating <span class="math inline">\(pd\)</span> from MCMC Draws in R</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href=""></a><span class="co"># Extract the raw MCMC draws for the contrast</span></span>
+<span id="cb7-2"><a href=""></a>draws <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(fit_gaussian)[[<span class="st">"b_ConditionCON_AGR_vs_DIS"</span>]]</span>
+<span id="cb7-3"><a href=""></a></span>
+<span id="cb7-4"><a href=""></a><span class="co"># Calculate the proportion of draws below 0</span></span>
+<span id="cb7-5"><a href=""></a>pd <span class="ot">&lt;-</span> <span class="fu">mean</span>(draws <span class="sc">&lt;</span> <span class="dv">0</span>)</span>
+<span id="cb7-6"><a href=""></a><span class="fu">print</span>(<span class="fu">paste</span>(<span class="st">"Probability of Direction (pd):"</span>, <span class="fu">round</span>(pd <span class="sc">*</span> <span class="dv">100</span>, <span class="dv">3</span>), <span class="st">"%"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "Probability of Direction (pd): 100 %"</code></pre>
+</div>
+</div>
+<div style="font-size: 65%;">
+<ul>
+<li class="fragment"><strong>Key Interpretation:</strong>
+<ul>
+<li class="fragment">There is a <strong>100% probability</strong> that discordant flankers slow down response times compared to congruent/control flankers.</li>
+<li class="fragment">This direct probability statement is highly intuitive and directly answers the scientific question, avoiding the common misinterpretations of frequentist <span class="math inline">\(p\)</span>-values.</li>
+<li class="fragment">If the effect were weaker and closer to 0, <span class="math inline">\(pd\)</span> would naturally decrease, representing a graded measure of evidence rather than a rigid threshold.</li>
+</ul></li>
+</ul>
+</div>
+</section>
+<section id="interpreting-bayes-factors-agrcon-vs.-dis" class="slide level2">
+<h2>3. Interpreting Bayes Factors: AGR/CON vs.&nbsp;DIS</h2>
+<p>The Bayes Factor (<span class="math inline">\(BF_{10}\)</span>) compares the relative evidence for the alternative hypothesis (<span class="math inline">\(H_1\)</span>: <span class="math inline">\(\beta \neq 0\)</span>) versus the null hypothesis (<span class="math inline">\(H_0\)</span>: <span class="math inline">\(\beta = 0\)</span>). In <code>brms</code>, the standard way to compute Savage-Dickey Bayes Factors is using the <code>hypothesis()</code> command.</p>
+<h3 id="testing-the-contrast-hypothesis-in-r">Testing the Contrast Hypothesis in R</h3>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href=""></a><span class="co"># Run Savage-Dickey hypothesis test on the contrast</span></span>
+<span id="cb9-2"><a href=""></a>hyp <span class="ot">&lt;-</span> <span class="fu">hypothesis</span>(fit_gaussian, <span class="st">"ConditionCON_AGR_vs_DIS = 0"</span>)</span>
+<span id="cb9-3"><a href=""></a><span class="fu">print</span>(hyp)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Hypothesis Tests for class b:
+                Hypothesis Estimate Est.Error CI.Lower CI.Upper Evid.Ratio
+1 (ConditionCON_AGR... = 0    -0.05         0    -0.06    -0.04         NA
+  Post.Prob Star
+1        NA    *
+---
+'CI': 90%-CI for one-sided and 95%-CI for two-sided hypotheses.
+'*': For one-sided hypotheses, the posterior probability exceeds 95%;
+for two-sided hypotheses, the value tested against lies outside the 95%-CI.
+Posterior probabilities of point hypotheses assume equal prior probabilities.</code></pre>
+</div>
+</div>
+<div style="font-size: 65%;">
+<ul>
+<li class="fragment"><strong>Understanding <code>Evid.Ratio</code> (Bayes Factor):</strong>
+<ul>
+<li class="fragment">The <strong><code>Evid.Ratio</code></strong> column shows the Savage-Dickey Bayes Factor.</li>
+<li class="fragment">Note that this <strong>only works</strong> if you add <code>sample_prior = "yes"</code> to the <code>brm()</code> command when fitting the model!</li>
+<li class="fragment">The result will be <strong><code>NA</code></strong> if the model was fit without saving prior samples.</li>
+<li class="fragment"><strong>Interpreting BF scales (Lee &amp; Wagenmakers, 2013):</strong>
+<ul>
+<li class="fragment"><span class="math inline">\(1 - 3\)</span>: Anecdotal | <span class="math inline">\(3 - 10\)</span>: Moderate | <span class="math inline">\(10 - 30\)</span>: Strong | <span class="math inline">\(&gt; 100\)</span>: Extreme evidence</li>
+</ul></li>
+</ul></li>
+</ul>
+</div>
+</section>
+<section id="interpreting-mcmc-diagnostics" class="slide level2">
+<h2>Interpreting MCMC Diagnostics</h2>
+<p>A critical step in Bayesian workflow is verifying that the chains have successfully converged and explored the target distribution.</p>
+<div style="font-size: 65%;">
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: right;">Rhat</th>
+<th style="text-align: right;">Bulk_ESS</th>
+<th style="text-align: right;">Tail_ESS</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Intercept</td>
+<td style="text-align: right;">1.02</td>
+<td style="text-align: right;">135.13</td>
+<td style="text-align: right;">214.05</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ConditionCON_vs_AGR</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">4482.44</td>
+<td style="text-align: right;">2892.35</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ConditionCON_AGR_vs_DIS</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">537.98</td>
+<td style="text-align: right;">1337.69</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">StimulusType1</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">1946.49</td>
+<td style="text-align: right;">2586.46</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ConditionCON_vs_AGR:StimulusType1</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">4063.60</td>
+<td style="text-align: right;">2671.72</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ConditionCON_AGR_vs_DIS:StimulusType1</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">4002.67</td>
+<td style="text-align: right;">2899.79</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<ul>
+<li class="fragment"><strong><span class="math inline">\(\hat{R}\)</span> (Potential Scale Reduction Factor):</strong> Measures variance between vs.&nbsp;within chains. At convergence, <span class="math inline">\(\hat{R} \le 1.01\)</span>. Here, all <span class="math inline">\(\hat{R}\)</span> are exactly <span class="math inline">\(1.00\)</span> or <span class="math inline">\(1.01\)</span>.</li>
+<li class="fragment"><strong>ESS (Effective Sample Size):</strong> Number of independent draws. Both <strong>Bulk ESS</strong> (for mean/medians) and <strong>Tail ESS</strong> (for credible intervals) should be <span class="math inline">\(&gt; 400\)</span> (ideally <span class="math inline">\(&gt; 1000\)</span>).</li>
+</ul>
+</section>
+<section id="convergence-issues-divergences-treedepth" class="slide level2">
+<h2>Convergence Issues: Divergences &amp; Treedepth</h2>
+<p>In addition to <span class="math inline">\(\hat{R}\)</span> and ESS, we must check for Hamiltonian Monte Carlo-specific diagnostics that indicate numerical sampling instabilities:</p>
+<div style="font-size: 65%;">
+<h3 id="divergent-transitions-divergences">1. Divergent Transitions (“Divergences”)</h3>
+<ul>
+<li class="fragment"><strong>What it means:</strong> The No-U-Turn Sampler’s numerical simulation broke down because it hit a region of extremely high curvature (often a hierarchical “funnel” where a group SD is very close to 0).</li>
+<li class="fragment"><strong>The danger:</strong> The posterior estimates are <strong>invalid and biased</strong>. The sampler cannot explore the “funnel” and misses parts of the distribution.</li>
+<li class="fragment"><strong>How to fix:</strong>
+<ul>
+<li class="fragment"><strong>Increase <code>adapt_delta</code>:</strong> E.g., <code>control = list(adapt_delta = 0.95)</code> or <code>0.99</code>. This forces the sampler to take smaller, more precise steps.</li>
+<li class="fragment"><strong>Stronger regularizing priors:</strong> Prevent Stan from drifting into extremely flat or highly curved, unstable areas.</li>
+</ul></li>
+</ul>
+<h3 id="maximum-treedepth-warnings">2. Maximum Treedepth Warnings</h3>
+<ul>
+<li class="fragment"><strong>What it means:</strong> The sampler took too many steps (default maximum is <span class="math inline">\(2^{10} = 1024\)</span> steps) trying to build a trajectory before turning around. It was terminated early to prevent getting stuck in infinite loops.</li>
+<li class="fragment"><strong>The danger:</strong> It is <strong>not mathematically invalid</strong> (unlike divergences), but it indicates extreme inefficiency, very slow sampling times, and low ESS.</li>
+<li class="fragment"><strong>How to fix:</strong>
+<ul>
+<li class="fragment"><strong>Increase <code>max_treedepth</code>:</strong> E.g., <code>control = list(max_treedepth = 15)</code>.</li>
+<li class="fragment"><strong>Simplify random effects or improve priors:</strong> High treedepth often indicates collinearity, overparameterization, or unidentifiable parameters.</li>
+</ul></li>
+</ul>
+</div>
+</section>
+<section id="posterior-predictive-check-ppc" class="slide level2">
+<h2>Posterior Predictive Check (PPC)</h2>
+<p>To evaluate how well our model’s Gaussian assumption matches the actual response time distribution, we can perform a <strong>Posterior Predictive Check</strong>:</p>
+<div class="cell" data-layout-align="center">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href=""></a><span class="fu">library</span>(bayesplot)</span>
+<span id="cb11-2"><a href=""></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb11-3"><a href=""></a><span class="fu">color_scheme_set</span>(<span class="st">"red"</span>)</span>
+<span id="cb11-4"><a href=""></a><span class="fu">pp_check</span>(fit_gaussian, <span class="at">ndraws =</span> <span class="dv">50</span>) <span class="sc">+</span></span>
+<span id="cb11-5"><a href=""></a>  <span class="fu">theme_minimal</span>(<span class="at">base_family =</span> <span class="st">"sans"</span>) <span class="sc">+</span></span>
+<span id="cb11-6"><a href=""></a>  <span class="fu">labs</span>(</span>
+<span id="cb11-7"><a href=""></a>    <span class="at">title =</span> <span class="st">"Posterior Predictive Check (Gaussian brms LMM)"</span>,</span>
+<span id="cb11-8"><a href=""></a>    <span class="at">x =</span> <span class="st">"Reaction Time (s)"</span>,</span>
+<span id="cb11-9"><a href=""></a>    <span class="at">y =</span> <span class="st">"Density"</span></span>
+<span id="cb11-10"><a href=""></a>  ) <span class="sc">+</span></span>
+<span id="cb11-11"><a href=""></a>  <span class="fu">theme</span>(</span>
+<span id="cb11-12"><a href=""></a>    <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>, <span class="at">color =</span> <span class="st">"#1F497D"</span>, <span class="at">size =</span> <span class="dv">14</span>),</span>
+<span id="cb11-13"><a href=""></a>    <span class="at">legend.position =</span> <span class="st">"bottom"</span></span>
+<span id="cb11-14"><a href=""></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+</div>
+<img data-src="session-2-brms_files/figure-revealjs/ppc-gaussian-model-1.png" class="quarto-figure quarto-figure-center r-stretch" style="width:70.0%"><div class="accent-box">
+<p>Notice that because reaction times are right-skewed, the Gaussian model’s replicates (thin lines) fail to capture the long right-tail of the raw data, and instead fits a much wider Gaussian distribution. We should try the <strong>ex-Gaussian</strong>.</p>
+</div>
+</section>
+<section id="part-3-modeling-rts-with-the-ex-gaussian-distribution" class="slide level2 dark-bg" data-background-color="#C2002F">
+<h2>Part 3: Modeling RTs with the ex-Gaussian Distribution</h2>
+</section>
+<section id="what-is-the-ex-gaussian-distribution" class="slide level2">
+<h2>What is the ex-Gaussian Distribution?</h2>
+<p>Human reaction times are rarely symmetrical. They are heavily right-skewed. The <strong>ex-Gaussian</strong> distribution represents this shape by combining a Gaussian (normal) component and an exponential component:</p>
+<p><span class="math display">\[\text{RT} \sim \text{Normal}(\text{Gaussian}) + \text{Exponential}\]</span></p>
+<p>The distribution is characterized by three parameters: * <strong><span class="math inline">\(\xi\)</span> (Gaussian Mean):</strong> Center of the normal component (reflects core decision onset and baseline foveal/cognitive latency). * <strong><span class="math inline">\(\sigma\)</span> (Gaussian SD):</strong> Standard deviation of the normal component (reflects foveal processing variance). * <strong><span class="math inline">\(\beta\)</span> (or <span class="math inline">\(\tau\)</span>, Exponential Scale):</strong> Scale/mean of the exponential component (reflects the slow decision tail, often linked to lapses of attention or threshold leakage).</p>
+<p><span class="math display">\[\text{Overall Mean } (M) = \xi + \beta\]</span></p>
+</section>
+<section id="systematic-effects-of-xi-and-beta" class="slide level2">
+<h2>Systematic Effects of <span class="math inline">\(\xi\)</span> and <span class="math inline">\(\beta\)</span></h2>
+<p>To understand how the Gaussian center (<span class="math inline">\(\xi\)</span>) and the exponential tail (<span class="math inline">\(\beta\)</span>) independently shape the density curve, we can systematically vary them across a grid:</p>
+
+<img data-src="images/exg_grid.png" class="quarto-figure quarto-figure-center r-stretch" style="width:100.0%"></section>
+<section id="standard-vs.-brms-parameterization" class="slide level2">
+<h2>Standard vs.&nbsp;<code>brms</code> Parameterization</h2>
+<p>In most descriptions of the ex-Gaussian distribution, it is parameterized using <span class="math inline">\((\xi, \sigma, \beta)\)</span> to represent the independent Gaussian and exponential components.</p>
+<p>However, <code>brms</code> does it differently:</p>
+<ul>
+<li class="fragment"><strong>In <code>brms</code>:</strong> You model <strong><span class="math inline">\(\mu\)</span> (the overall mean of the entire distribution)</strong> and <strong><span class="math inline">\(\beta\)</span> (the scale of the exponential component)</strong> directly.</li>
+<li class="fragment">The central Gaussian mean (<span class="math inline">\(\xi\)</span>) is calculated implicitly behind the scenes as:</li>
+</ul>
+<p><span class="math display">\[\xi = \mu - \beta\]</span></p>
+</section>
+<section id="how-to-interpret-this" class="slide level2">
+<h2>How to interpret this</h2>
+<p>When <strong>only <code>mu</code> varies</strong> in <code>brms</code> (while the exponential tail scale <code>beta</code> remains constant):</p>
+
+<img data-src="images/exg_mu_varying.png" class="quarto-figure quarto-figure-center r-stretch" style="width:75.0%"><p>Since <span class="math inline">\(\beta\)</span> is constant and <span class="math inline">\(\mu\)</span> increases, the Gaussian center also increases (<span class="math inline">\(\xi = \mu - \beta\)</span>). The entire distribution shifts laterally; the shape and right-tail skew remain identical.</p>
+<ul>
+<li class="fragment">By default, <code>brms</code> will assume that <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\sigma\)</span> are the same for every observation and only <span class="math inline">\(\mu\)</span> is influenced by fixed and random effects.</li>
+</ul>
+</section>
+<section id="bayesian-rt-priors-ex-gaussian-setup" class="slide level2">
+<h2>Bayesian RT: Priors &amp; ex-Gaussian setup</h2>
+<p>We will define regularizing priors for both the Gaussian core (<span class="math inline">\(\mu\)</span>) and the exponential tail (<span class="math inline">\(\beta\)</span>) of our reaction times before fitting the model in <code>brms</code>:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href=""></a><span class="fu">library</span>(brms)</span>
+<span id="cb12-2"><a href=""></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb12-3"><a href=""></a></span>
+<span id="cb12-4"><a href=""></a><span class="co"># Define regularizing priors on the log/raw scale</span></span>
+<span id="cb12-5"><a href=""></a>priors_exg <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb12-6"><a href=""></a>  <span class="fu">prior</span>(<span class="fu">normal</span>(<span class="dv">0</span>, <span class="fl">0.1</span>), <span class="at">class =</span> <span class="st">"b"</span>),                 <span class="co"># Fixed effects on RT</span></span>
+<span id="cb12-7"><a href=""></a>  <span class="fu">prior</span>(<span class="fu">exponential</span>(<span class="dv">2</span>), <span class="at">class =</span> <span class="st">"sd"</span>),                <span class="co"># Subject/Item variation</span></span>
+<span id="cb12-8"><a href=""></a>  <span class="fu">prior</span>(<span class="fu">lkj</span>(<span class="dv">2</span>), <span class="at">class =</span> <span class="st">"cor"</span>),                       <span class="co"># Random correlation matrix</span></span>
+<span id="cb12-9"><a href=""></a>  </span>
+<span id="cb12-10"><a href=""></a>  <span class="co"># Priors for the exponential parameter beta</span></span>
+<span id="cb12-11"><a href=""></a>  <span class="fu">prior</span>(<span class="fu">normal</span>(<span class="dv">0</span>, <span class="fl">0.3</span>), <span class="at">class =</span> <span class="st">"b"</span>, <span class="at">dpar =</span> <span class="st">"beta"</span>)</span>
+<span id="cb12-12"><a href=""></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="fitting-ex-gaussian-in-brms-command" class="slide level2">
+<h2>Fitting ex-Gaussian in brms (Command)</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href=""></a><span class="co"># Fit ex-Gaussian model on Flanker Exp 1 correct RTs</span></span>
+<span id="cb13-2"><a href=""></a>blmm_rt <span class="ot">&lt;-</span> <span class="fu">brm</span>(</span>
+<span id="cb13-3"><a href=""></a>  <span class="at">formula =</span> <span class="fu">bf</span>(</span>
+<span id="cb13-4"><a href=""></a>    rt <span class="sc">~</span> Condition <span class="sc">*</span> StimulusType <span class="sc">+</span> (Condition <span class="sc">*</span> StimulusType <span class="sc">|</span> subject) <span class="sc">+</span> (Condition <span class="sc">|</span> item),</span>
+<span id="cb13-5"><a href=""></a>    beta <span class="sc">~</span> Condition <span class="sc">*</span> StimulusType <span class="sc">+</span> (Condition <span class="sc">*</span> StimulusType <span class="sc">|</span> subject) <span class="sc">+</span> (Condition <span class="sc">|</span> item)</span>
+<span id="cb13-6"><a href=""></a>  ),</span>
+<span id="cb13-7"><a href=""></a>  <span class="at">data =</span> flanker_rt_data,</span>
+<span id="cb13-8"><a href=""></a>  <span class="at">family =</span> <span class="fu">exgaussian</span>(),</span>
+<span id="cb13-9"><a href=""></a>  <span class="at">prior =</span> priors_exg,</span>
+<span id="cb13-10"><a href=""></a>  <span class="at">chains =</span> <span class="dv">4</span>, <span class="at">iter =</span> <span class="dv">4000</span>, <span class="at">warmup =</span> <span class="dv">2000</span>,</span>
+<span id="cb13-11"><a href=""></a>  <span class="co"># if you get divergent transitions, try adapt_delta = 0.95 </span></span>
+<span id="cb13-12"><a href=""></a>  <span class="at">control =</span> <span class="fu">list</span>(<span class="at">adapt_delta =</span> <span class="fl">0.8</span>),</span>
+<span id="cb13-13"><a href=""></a>  <span class="at">cores =</span> <span class="dv">4</span>, <span class="at">backend =</span> <span class="st">"cmdstanr"</span></span>
+<span id="cb13-14"><a href=""></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="model-output-ex-gaussian-mu-only" class="slide level2">
+<h2>Model Output: ex-Gaussian (mu-only)</h2>
+<div style="font-size: 55%;">
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top">
+<colgroup>
+<col style="width: 38%">
+<col style="width: 9%">
+<col style="width: 10%">
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 6%">
+<col style="width: 9%">
+<col style="width: 9%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: right;">Estimate</th>
+<th style="text-align: right;">Est.Error</th>
+<th style="text-align: right;">l-95% CI</th>
+<th style="text-align: right;">u-95% CI</th>
+<th style="text-align: right;">Rhat</th>
+<th style="text-align: right;">Bulk_ESS</th>
+<th style="text-align: right;">Tail_ESS</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Intercept</td>
+<td style="text-align: right;">0.504</td>
+<td style="text-align: right;">0.006</td>
+<td style="text-align: right;">0.491</td>
+<td style="text-align: right;">0.516</td>
+<td style="text-align: right;">1.017</td>
+<td style="text-align: right;">153.506</td>
+<td style="text-align: right;">324.232</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ConditionCON_vs_AGR</td>
+<td style="text-align: right;">-0.003</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">-0.005</td>
+<td style="text-align: right;">-0.001</td>
+<td style="text-align: right;">1.000</td>
+<td style="text-align: right;">8065.715</td>
+<td style="text-align: right;">5606.836</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ConditionCON_AGR_vs_DIS</td>
+<td style="text-align: right;">-0.027</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">-0.031</td>
+<td style="text-align: right;">-0.022</td>
+<td style="text-align: right;">1.005</td>
+<td style="text-align: right;">559.963</td>
+<td style="text-align: right;">1740.645</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">StimulusType1</td>
+<td style="text-align: right;">0.004</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">0.007</td>
+<td style="text-align: right;">1.001</td>
+<td style="text-align: right;">2682.190</td>
+<td style="text-align: right;">4334.151</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ConditionCON_vs_AGR:StimulusType1</td>
+<td style="text-align: right;">-0.001</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">-0.003</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">1.000</td>
+<td style="text-align: right;">8252.982</td>
+<td style="text-align: right;">5755.333</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ConditionCON_AGR_vs_DIS:StimulusType1</td>
+<td style="text-align: right;">-0.001</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">-0.003</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">1.000</td>
+<td style="text-align: right;">5656.078</td>
+<td style="text-align: right;">6039.009</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="accent-box">
+<ul>
+<li class="fragment"><strong><span class="math inline">\(\beta\)</span> (Exponential Scale):</strong> A single value is estimated for <span class="math inline">\(\beta\)</span> across all conditions, representing the average scale of the exponential tail. In this model, <span class="math inline">\(\beta\)</span> is approximately 0.1s (100 ms), indicating that on average, the exponential tail adds about 100 ms of latency to the core Gaussian component. 0.139s (approx. 139 of latency added by the exponential tail)</li>
+</ul>
+</div>
+</section>
+<section id="ppc-ex-gaussian-mu-only-model" class="slide level2">
+<h2>PPC: ex-Gaussian (mu-only) Model</h2>
+<p>To evaluate the fit of the ex-Gaussian model with fixed/random effects restricted to the mean <span class="math inline">\(\mu\)</span>:</p>
+
+<img data-src="session-2-brms_files/figure-revealjs/ppc-exg-mu-model-1.png" class="quarto-figure quarto-figure-center r-stretch" style="width:70.0%"><div class="accent-box">
+<p>Notice how much better the ex-Gaussian family captures the raw data’s right-skewed tail compared to the standard Gaussian model!</p>
+</div>
+</section>
+<section id="part-4-predicting-multiple-parameters" class="slide level2 dark-bg" data-background-color="#C2002F">
+<h2>Part 4: Predicting multiple parameters</h2>
+</section>
+<section id="extending-the-model-allowing-effects-on-beta" class="slide level2">
+<h2>Extending the model: allowing effects on <span class="math inline">\(\beta\)</span></h2>
+<ul>
+<li class="fragment">In <code>brms</code>, you can specify a regression equation for every distribution parameter!</li>
+<li class="fragment">Because of the parameterization used in <code>brms</code>, be careful how you interpret the results:</li>
+</ul>
+<div class="accent-box">
+<p>If your experimental condition only increases the exponential tail (<span class="math inline">\(\beta\)</span>) while the core Gaussian component (<span class="math inline">\(\xi\)</span>) remains completely unchanged, <code>brms</code> will show a positive coefficient for <strong>both</strong> <code>mu</code> and <code>beta</code> because: <span class="math display">\[\mu = \xi + \beta\]</span></p>
+</div>
+</section>
+<section id="varying-beta" class="slide level2">
+<h2>Varying beta</h2>
+<p>When the core Gaussian component <strong><code>xi</code> remains completely constant</strong>, but the <strong>tail skew <code>beta</code> increases</strong>:</p>
+
+<img data-src="images/exg_mu_beta_varying.png" class="quarto-figure quarto-figure-center r-stretch" style="width:75.0%"><p>The peak/onset remains at the exact same location, but the right tail becomes fatter. In <code>brms</code>, because <span class="math inline">\(\mu = \xi + \beta\)</span>, the overall mean <span class="math inline">\(\mu\)</span> increases, resulting in positive coefficients for <strong>both</strong> <code>mu</code> and <code>beta</code>!</p>
+</section>
+<section id="model-output-ex-gaussian-mu-beta" class="slide level2">
+<h2>Model Output: ex-Gaussian (mu &amp; beta)</h2>
+<p>Here are the coefficients for both <span class="math inline">\(\mu\)</span> (mean) and <span class="math inline">\(\beta\)</span> (exponential tail scale) from the full model:</p>
+<div style="font-size: 50%;">
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top">
+<colgroup>
+<col style="width: 41%">
+<col style="width: 8%">
+<col style="width: 9%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 5%">
+<col style="width: 8%">
+<col style="width: 8%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: right;">Estimate</th>
+<th style="text-align: right;">Est.Error</th>
+<th style="text-align: right;">l-95% CI</th>
+<th style="text-align: right;">u-95% CI</th>
+<th style="text-align: right;">Rhat</th>
+<th style="text-align: right;">Bulk_ESS</th>
+<th style="text-align: right;">Tail_ESS</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Intercept</td>
+<td style="text-align: right;">0.505</td>
+<td style="text-align: right;">0.008</td>
+<td style="text-align: right;">0.489</td>
+<td style="text-align: right;">0.521</td>
+<td style="text-align: right;">1.015</td>
+<td style="text-align: right;">167.898</td>
+<td style="text-align: right;">421.877</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">beta_Intercept</td>
+<td style="text-align: right;">-2.048</td>
+<td style="text-align: right;">0.031</td>
+<td style="text-align: right;">-2.111</td>
+<td style="text-align: right;">-1.989</td>
+<td style="text-align: right;">1.012</td>
+<td style="text-align: right;">421.849</td>
+<td style="text-align: right;">778.370</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ConditionCON_vs_AGR</td>
+<td style="text-align: right;">-0.003</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">-0.006</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">1.000</td>
+<td style="text-align: right;">5794.386</td>
+<td style="text-align: right;">3859.515</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ConditionCON_AGR_vs_DIS</td>
+<td style="text-align: right;">-0.051</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">-0.056</td>
+<td style="text-align: right;">-0.046</td>
+<td style="text-align: right;">1.005</td>
+<td style="text-align: right;">512.686</td>
+<td style="text-align: right;">1342.253</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">StimulusType1</td>
+<td style="text-align: right;">0.006</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">0.010</td>
+<td style="text-align: right;">1.000</td>
+<td style="text-align: right;">2669.616</td>
+<td style="text-align: right;">3041.321</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ConditionCON_vs_AGR:StimulusType1</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">-0.002</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">1.001</td>
+<td style="text-align: right;">5472.649</td>
+<td style="text-align: right;">3522.651</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ConditionCON_AGR_vs_DIS:StimulusType1</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">-0.004</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">1.002</td>
+<td style="text-align: right;">5857.252</td>
+<td style="text-align: right;">3582.594</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">beta_ConditionCON_vs_AGR</td>
+<td style="text-align: right;">-0.003</td>
+<td style="text-align: right;">0.015</td>
+<td style="text-align: right;">-0.031</td>
+<td style="text-align: right;">0.025</td>
+<td style="text-align: right;">1.000</td>
+<td style="text-align: right;">6642.590</td>
+<td style="text-align: right;">2993.674</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">beta_ConditionCON_AGR_vs_DIS</td>
+<td style="text-align: right;">-0.252</td>
+<td style="text-align: right;">0.013</td>
+<td style="text-align: right;">-0.277</td>
+<td style="text-align: right;">-0.227</td>
+<td style="text-align: right;">0.999</td>
+<td style="text-align: right;">7024.408</td>
+<td style="text-align: right;">3625.128</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">beta_StimulusType1</td>
+<td style="text-align: right;">0.028</td>
+<td style="text-align: right;">0.007</td>
+<td style="text-align: right;">0.013</td>
+<td style="text-align: right;">0.041</td>
+<td style="text-align: right;">1.001</td>
+<td style="text-align: right;">7218.173</td>
+<td style="text-align: right;">2944.336</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">beta_ConditionCON_vs_AGR:StimulusType1</td>
+<td style="text-align: right;">0.022</td>
+<td style="text-align: right;">0.015</td>
+<td style="text-align: right;">-0.007</td>
+<td style="text-align: right;">0.051</td>
+<td style="text-align: right;">1.000</td>
+<td style="text-align: right;">7889.874</td>
+<td style="text-align: right;">3163.014</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">beta_ConditionCON_AGR_vs_DIS:StimulusType1</td>
+<td style="text-align: right;">0.017</td>
+<td style="text-align: right;">0.013</td>
+<td style="text-align: right;">-0.008</td>
+<td style="text-align: right;">0.043</td>
+<td style="text-align: right;">1.001</td>
+<td style="text-align: right;">5975.585</td>
+<td style="text-align: right;">3306.686</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="accent-box">
+<ul>
+<li class="fragment">Predicting both <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\beta\)</span> reveals whether experimental factors independently influence baseline cognitive latency (<span class="math inline">\(\mu\)</span>) vs.&nbsp;processing lapses/decision threshold leakage (<span class="math inline">\(\beta\)</span>).</li>
+</ul>
+</div>
+</section>
+<section id="ppc-ex-gaussian-mu-beta-model" class="slide level2">
+<h2>PPC: ex-Gaussian (mu &amp; beta) Model</h2>
+<p>To evaluate the full predictive accuracy of the ex-Gaussian model predicting both <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\beta\)</span>:</p>
+
+<img data-src="session-2-brms_files/figure-revealjs/ppc-exg-mu-beta-model-1.png" class="quarto-figure quarto-figure-center r-stretch" style="width:70.0%"><div class="accent-box">
+<p>The fit is almost perfect! By allowing both <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\beta\)</span> to vary, the model can flexibly capture changes in both the core Gaussian latency and the exponential tail, resulting in an excellent match to the raw RT distribution. Also, now we gain insight into where in the distribution our experimental effects are occurring (core latency vs.&nbsp;tail skew).</p>
+</div>
+</section>
+<section id="session-2-summary" class="slide level2">
+<h2>Session 2 Summary</h2>
+<div style="font-size: 70%;">
+<ol type="1">
+<li class="fragment">We have seen how you can use <code>brms</code> to fit Bayesian linear mixed models with the same formula syntax as <code>lme4</code>, but with the added flexibility of specifying priors and modeling different likelihood families (e.g.&nbsp;ex-Gaussian for RTs).</li>
+<li class="fragment"><strong>Posterior Interpretation:</strong> We interpret Bayesian model outputs using three complementary metrics:
+<ul>
+<li class="fragment"><strong>Credible Intervals (CI):</strong> Direct probability (e.g.&nbsp;95%) that the true effect lies in a given range.</li>
+<li class="fragment"><strong>Probability of Direction (<span class="math inline">\(pd\)</span>):</strong> Graded direct probability that an effect is positive or negative.</li>
+<li class="fragment"><strong>Bayes Factors (BF):</strong> Relative evidence for alternative vs.&nbsp;null (<span class="math inline">\(H_1\)</span> vs.&nbsp;<span class="math inline">\(H_0\)</span>), computed in <code>brms</code> using <code>hypothesis(..., sample_prior="yes")</code>.</li>
+</ul></li>
+<li class="fragment"><strong>HMC Convergence Diagnostics:</strong> When using <code>brms</code> and Stan, you must verify that chains have converged by ensuring <span class="math inline">\(\hat{R} \le 1.01\)</span> and ESS <span class="math inline">\(&gt; 1000\)</span>. Your model must not have any <strong>divergent transitions</strong> (try increasing <code>adapt_delta</code>). If you get warnings about exceeding <strong>maximum treedepth limits</strong>, your model may be very inefficient and require simplification or stronger priors.</li>
+<li class="fragment"><strong>Model Verification:</strong> Always perform Posterior Predictive Checks (<code>pp_check()</code>) to visually confirm that the model’s posterior predictions accurately recreate the shape of the observed data.</li>
+</ol>
+</div>
+</section>
+<section id="homework" class="slide level2">
+<h2>Homework</h2>
+<p>Try to apply the concepts from this session to your own data! Fit a Bayesian linear mixed model using <code>brms</code> with appropriate priors, check convergence diagnostics, and perform posterior predictive checks to evaluate model fit. Write a results section interpreting the credible intervals, probability of direction, and Bayes factors for your key contrasts. See <span class="citation" data-cites="serrano-carot2026lcn">Serrano-Carot et al. (<a href="#/references" role="doc-biblioref" onclick="">2026</a>)</span> for an example of how to write up Bayesian results.</p>
+</section>
+<section id="references" class="slide level2 smaller scrollable">
+<h2>References</h2>
+<div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" data-line-spacing="2" role="list">
+<div id="ref-serrano-carot2026lcn" class="csl-entry" role="listitem">
+Serrano-Carot, M., Gomez, P., &amp; Angele, B. (2026). Articles as flankers: The effect of grammatical gender depends on the task. <em>Language, Cognition and Neuroscience</em>, <em>0</em>(0), 1–23. <a href="https://doi.org/10.1080/23273798.2026.2657830">https://doi.org/10.1080/23273798.2026.2657830</a>
+</div>
+</div>
+
+</section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<p><img src="images/logo.png" class="slide-logo"></p>
+<div class="footer footer-default">
+
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src="session-2-brms_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src="session-2-brms_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src="session-2-brms_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src="session-2-brms_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src="session-2-brms_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src="session-2-brms_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src="session-2-brms_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src="session-2-brms_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src="session-2-brms_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src="session-2-brms_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'c/t',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'linear',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: false,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'none',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'none',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1050,
+
+        height: 700,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        math: {
+          mathjax: 'https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    
+    <script>
+      // htmlwidgets need to know to resize themselves when slides are shown/hidden.
+      // Fire the "slideenter" event (handled by htmlwidgets.js) when the current
+      // slide changes (different for each slide format).
+      (function () {
+        // dispatch for htmlwidgets
+        function fireSlideEnter() {
+          const event = window.document.createEvent("Event");
+          event.initEvent("slideenter", true, true);
+          window.document.dispatchEvent(event);
+        }
+
+        function fireSlideChanged(previousSlide, currentSlide) {
+          fireSlideEnter();
+
+          // dispatch for shiny
+          if (window.jQuery) {
+            if (previousSlide) {
+              window.jQuery(previousSlide).trigger("hidden");
+            }
+            if (currentSlide) {
+              window.jQuery(currentSlide).trigger("shown");
+            }
+          }
+        }
+
+        // hookup for slidy
+        if (window.w3c_slidy) {
+          window.w3c_slidy.add_observer(function (slide_num) {
+            // slide_num starts at position 1
+            fireSlideChanged(null, w3c_slidy.slides[slide_num - 1]);
+          });
+        }
+
+      })();
+    </script>
+
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Copied!");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Copied!");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+          const outerScaffold = trigger.parentElement.cloneNode(true);
+          const codeEl = outerScaffold.querySelector('code');
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp('/' + window.location.host + '/');
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>
